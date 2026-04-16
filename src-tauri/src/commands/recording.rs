@@ -6,6 +6,7 @@ use tauri::{AppHandle, Manager, State};
 use super::ffmpeg;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RecordingConfig {
     pub x: i32,
     pub y: i32,

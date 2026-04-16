@@ -1,6 +1,9 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { save } from "@tauri-apps/plugin-dialog";
 import { useRecordingStore } from "../../stores/recordingStore";
+import type { CaptureResult } from "../../types/capture";
 
 interface RegionState {
   startX: number;
@@ -12,6 +15,7 @@ interface RegionState {
 
 export function RecordingRegionSelector() {
   const { setIsSelectingRegion, startRecording } = useRecordingStore();
+  const [screenshotBg, setScreenshotBg] = useState<string | null>(null);
   const [region, setRegion] = useState<RegionState>({
     startX: 0,
     startY: 0,
@@ -20,6 +24,49 @@ export function RecordingRegionSelector() {
     isDragging: false,
   });
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Hide window, take screenshot, then go fullscreen with screenshot as background
+  useEffect(() => {
+    let cancelled = false;
+    const setup = async () => {
+      const mainWindow = getCurrentWindow();
+      await mainWindow.hide();
+      await new Promise((r) => setTimeout(r, 50));
+
+      const result = await invoke<CaptureResult>("capture_fullscreen_fast");
+      if (cancelled) return;
+
+      const mime = result.format === "bmp" ? "image/bmp" : "image/png";
+      setScreenshotBg(`data:${mime};base64,${result.base64}`);
+
+      await mainWindow.setAlwaysOnTop(true);
+      await mainWindow.setFullscreen(true);
+      await mainWindow.show();
+      await mainWindow.setFocus();
+    };
+    setup();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Focus overlay for keyboard events
+  useEffect(() => {
+    if (screenshotBg && overlayRef.current) {
+      overlayRef.current.focus();
+    }
+  }, [screenshotBg]);
+
+  const restoreWindow = async () => {
+    const mainWindow = getCurrentWindow();
+    await mainWindow.setFullscreen(false);
+    await mainWindow.setAlwaysOnTop(false);
+    await mainWindow.show();
+    await mainWindow.setFocus();
+  };
+
+  const handleCancel = useCallback(async () => {
+    await restoreWindow();
+    setIsSelectingRegion(false);
+  }, [setIsSelectingRegion]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setRegion({
@@ -50,11 +97,13 @@ export function RecordingRegionSelector() {
     setRegion((prev) => ({ ...prev, isDragging: false }));
 
     if (width < 50 || height < 50) {
+      await restoreWindow();
       setIsSelectingRegion(false);
       return;
     }
 
-    // Ask where to save the recording
+    await restoreWindow();
+
     const outputPath = await save({
       filters: [{ name: "MP4 Video", extensions: ["mp4"] }],
       defaultPath: `recording-${Date.now()}.mp4`,
@@ -89,16 +138,33 @@ export function RecordingRegionSelector() {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
-        setIsSelectingRegion(false);
+        handleCancel();
       }
     },
-    [setIsSelectingRegion]
+    [handleCancel]
   );
 
   const selectionX = Math.min(region.startX, region.endX);
   const selectionY = Math.min(region.startY, region.endY);
   const selectionW = Math.abs(region.endX - region.startX);
   const selectionH = Math.abs(region.endY - region.startY);
+
+  // Loading state
+  if (!screenshotBg) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 9998,
+          backgroundColor: "#000",
+        }}
+      />
+    );
+  }
 
   return (
     <div
@@ -116,9 +182,24 @@ export function RecordingRegionSelector() {
         height: "100vh",
         cursor: "crosshair",
         zIndex: 9998,
-        backgroundColor: "rgba(0, 0, 0, 0.3)",
+        backgroundImage: `url(${screenshotBg})`,
+        backgroundSize: "100vw 100vh",
+        backgroundPosition: "0 0",
       }}
     >
+      {/* Dark overlay */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          backgroundColor: "rgba(0, 0, 0, 0.3)",
+          pointerEvents: "none",
+        }}
+      />
+
       {/* Instructions */}
       <div
         style={{
@@ -138,7 +219,7 @@ export function RecordingRegionSelector() {
         Drag to select recording region — Press ESC to cancel
       </div>
 
-      {/* Selection rectangle */}
+      {/* Selection rectangle with clear view */}
       {region.isDragging && selectionW > 0 && selectionH > 0 && (
         <>
           <div
@@ -148,8 +229,10 @@ export function RecordingRegionSelector() {
               top: selectionY,
               width: selectionW,
               height: selectionH,
+              backgroundImage: `url(${screenshotBg})`,
+              backgroundSize: `${window.innerWidth}px ${window.innerHeight}px`,
+              backgroundPosition: `-${selectionX}px -${selectionY}px`,
               border: "2px solid #FF3B30",
-              backgroundColor: "rgba(255, 59, 48, 0.1)",
               pointerEvents: "none",
               zIndex: 5,
             }}

@@ -96,7 +96,7 @@ export function TitleBar() {
   const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } =
     useUIStore();
   const { mode, delay, setMode, setDelay } = useCaptureStore();
-  const { isRecording, setIsSelectingRegion, checkFfmpeg } = useRecordingStore();
+  const { isRecording, setIsSelectingRegion, checkFfmpeg, saveWindowState } = useRecordingStore();
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -237,6 +237,7 @@ export function TitleBar() {
               }
               return;
             }
+            await saveWindowState();
             setIsSelectingRegion(true);
           }}
           style={{

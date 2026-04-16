@@ -34,7 +34,6 @@ export function CaptureOverlay() {
   const restoreMainWindow = async () => {
     const mainWindow = getCurrentWindow();
     await mainWindow.setFullscreen(false);
-    await mainWindow.setDecorations(true);
     await mainWindow.setAlwaysOnTop(false);
     await mainWindow.show();
     await mainWindow.setFocus();
@@ -88,7 +87,6 @@ export function CaptureOverlay() {
         const mime = result.format === "bmp" ? "image/bmp" : "image/png";
         setScreenshotBg(`data:${mime};base64,${result.base64}`);
 
-        await mainWindow.setDecorations(false);
         await mainWindow.setAlwaysOnTop(true);
         await mainWindow.setFullscreen(true);
         await mainWindow.show();

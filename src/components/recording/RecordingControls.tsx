@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Circle, Square } from "lucide-react";
+import { Square } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useRecordingStore } from "../../stores/recordingStore";
 
 function formatTime(seconds: number): string {
@@ -13,6 +14,25 @@ function formatTime(seconds: number): string {
 export function RecordingControls() {
   const { isRecording, elapsedSeconds, stopRecording, tick } = useRecordingStore();
 
+  // On mount: shrink window to small pill, always on top
+  useEffect(() => {
+    if (!isRecording) return;
+
+    const setup = async () => {
+      const mainWindow = getCurrentWindow();
+      await mainWindow.setAlwaysOnTop(true);
+      await mainWindow.setSize({ type: "Logical", width: 220, height: 50 });
+      await mainWindow.setPosition({
+        type: "Logical",
+        x: Math.round(screen.width / 2 - 110),
+        y: 10,
+      });
+      await mainWindow.setFocus();
+    };
+
+    setup();
+  }, [isRecording]);
+
   // Timer tick
   useEffect(() => {
     if (!isRecording) return;
@@ -24,19 +44,20 @@ export function RecordingControls() {
 
   return (
     <div
+      data-tauri-drag-region
       style={{
         position: "fixed",
-        top: 12,
-        left: "50%",
-        transform: "translateX(-50%)",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         gap: 12,
-        padding: "8px 16px",
-        backgroundColor: "rgba(0, 0, 0, 0.85)",
-        borderRadius: 24,
-        zIndex: 9999,
-        boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+        backgroundColor: "rgba(30, 30, 30, 0.95)",
+        cursor: "grab",
+        userSelect: "none",
       }}
     >
       {/* Recording indicator */}
@@ -47,6 +68,7 @@ export function RecordingControls() {
           borderRadius: "50%",
           backgroundColor: "#FF3B30",
           animation: "blink 1s infinite",
+          flexShrink: 0,
         }}
       />
       <style>{`
@@ -56,7 +78,10 @@ export function RecordingControls() {
         }
       `}</style>
 
-      <span style={{ color: "#fff", fontSize: 14, fontFamily: "monospace", minWidth: 50 }}>
+      <span
+        data-tauri-drag-region
+        style={{ color: "#fff", fontSize: 14, fontFamily: "monospace", minWidth: 50 }}
+      >
         {formatTime(elapsedSeconds)}
       </span>
 
@@ -68,16 +93,17 @@ export function RecordingControls() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 32,
-          height: 32,
+          width: 28,
+          height: 28,
           borderRadius: "50%",
           border: "2px solid #FF3B30",
           backgroundColor: "transparent",
           cursor: "pointer",
           color: "#FF3B30",
+          flexShrink: 0,
         }}
       >
-        <Square size={14} fill="#FF3B30" />
+        <Square size={12} fill="#FF3B30" />
       </button>
     </div>
   );
