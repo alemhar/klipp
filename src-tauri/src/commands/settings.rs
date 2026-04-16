@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub theme: String,
     pub auto_copy_to_clipboard: bool,

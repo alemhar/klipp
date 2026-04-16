@@ -19,7 +19,7 @@ function App() {
   const { isCaptureMode, setIsCaptureMode, showSettings } = useUIStore();
   const { setCapturedImage } = useCaptureStore();
   const { undo, redo } = useCanvasStore();
-  const { settings, loadSettings } = useSettingsStore();
+  const { settings, isLoaded, loadSettings } = useSettingsStore();
 
   // Load settings on mount
   useEffect(() => {
@@ -45,8 +45,12 @@ function App() {
     }
   }, [setCapturedImage, settings.autoCopyToClipboard]);
 
-  // Register global shortcut
-  useGlobalShortcut(settings.captureShortcut, handleCaptureShortcut);
+  // Register global shortcut (only after settings are loaded)
+  useGlobalShortcut(
+    settings.captureShortcut || "Ctrl+Shift+S",
+    handleCaptureShortcut,
+    isLoaded
+  );
 
   // Listen for tray events
   useEffect(() => {

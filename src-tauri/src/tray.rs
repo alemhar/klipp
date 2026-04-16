@@ -5,7 +5,7 @@ use tauri::{
 };
 
 pub fn create_tray(app: &App) -> Result<(), Box<dyn std::error::Error>> {
-    let new_snip = MenuItem::with_id(app, "new_snip", "New Snip", true, Some("Ctrl+Shift+S"))?;
+    let new_snip = MenuItem::with_id(app, "new_snip", "New Snip (Ctrl+Shift+S)", true, None::<&str>)?;
     let screen_record =
         MenuItem::with_id(app, "screen_record", "Screen Record", false, None::<&str>)?;
     let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
