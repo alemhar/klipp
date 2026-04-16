@@ -32,6 +32,8 @@ pub fn run() {
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::is_recording,
+            commands::mouse_hook::start_mouse_hook,
+            commands::mouse_hook::stop_mouse_hook,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
