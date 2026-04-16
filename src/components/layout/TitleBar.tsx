@@ -1,13 +1,9 @@
 import { Camera, Settings, Moon, Sun } from "lucide-react";
 import { useUIStore } from "../../stores/uiStore";
-import { invoke } from "@tauri-apps/api/core";
-import type { CaptureResult } from "../../types/capture";
-import { useCaptureStore } from "../../stores/captureStore";
 import { APP_NAME } from "../../lib/constants";
 
 export function TitleBar() {
-  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings } = useUIStore();
-  const { setCapturedImage } = useCaptureStore();
+  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } = useUIStore();
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -16,13 +12,8 @@ export function TitleBar() {
     document.documentElement.setAttribute("data-theme", next);
   };
 
-  const handleNewCapture = async () => {
-    try {
-      const result = await invoke<CaptureResult>("capture_fullscreen");
-      setCapturedImage(result);
-    } catch (e) {
-      console.error("Capture failed:", e);
-    }
+  const handleNewCapture = () => {
+    setIsCaptureMode(true);
   };
 
   return (

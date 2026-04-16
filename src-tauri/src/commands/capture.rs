@@ -39,3 +39,30 @@ pub fn capture_region(x: i32, y: i32, width: i32, height: i32) -> Result<Capture
         height: h,
     })
 }
+
+/// Crops a region from an existing base64-encoded image (no new screenshot)
+#[tauri::command]
+pub fn crop_image(
+    base64_data: String,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<CaptureResult, String> {
+    let bytes = STANDARD
+        .decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    let img = image::load_from_memory(&bytes)
+        .map_err(|e| format!("Failed to load image: {}", e))?;
+
+    let cropped = img.crop_imm(x, y, width, height).to_rgba8();
+    let (w, h) = cropped.dimensions();
+    let base64 = image_to_base64(&cropped)?;
+
+    Ok(CaptureResult {
+        base64,
+        width: w,
+        height: h,
+    })
+}
