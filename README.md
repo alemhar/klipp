@@ -25,6 +25,7 @@ An open-source screenshot and screen recording tool with powerful annotation sup
 - System audio + microphone capture
 - **Mouse click indicator** for demos and tutorials
 - Pause/resume controls
+- FFmpeg is downloaded automatically on first use (~30MB, one-time)
 
 **Other**
 - OCR text extraction from screenshots
@@ -66,6 +67,10 @@ npm run tauri build
 ```
 
 Installers are generated in `src-tauri/target/release/bundle/`.
+
+## Third-Party Dependencies
+
+**FFmpeg** — Screen recording uses [FFmpeg](https://ffmpeg.org/), a free and open-source multimedia framework licensed under LGPL/GPL. FFmpeg is **not bundled** with SnippingZo — it is downloaded automatically (~30MB) on first use of the screen recording feature. FFmpeg is stored in the app's local data directory and is only used for video encoding. You can also install FFmpeg manually via `winget install Gyan.FFmpeg`. Screenshot capture and all annotation features work without FFmpeg.
 
 ## Contributing
 

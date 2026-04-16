@@ -220,9 +220,20 @@ export function TitleBar() {
             if (isRecording) return;
             const hasFfmpeg = await checkFfmpeg();
             if (!hasFfmpeg) {
-              alert(
-                "FFmpeg is required for screen recording.\n\nInstall it via:\n  winget install Gyan.FFmpeg\n\nThen restart SnippingZo."
+              const shouldDownload = confirm(
+                "Screen recording requires FFmpeg (a free, open-source video encoder).\n\n" +
+                "SnippingZo can download it automatically (~30MB, one-time only).\n\n" +
+                "Click OK to download now."
               );
+              if (shouldDownload) {
+                try {
+                  const { invoke } = await import("@tauri-apps/api/core");
+                  await invoke("download_ffmpeg");
+                  alert("FFmpeg downloaded successfully! You can now use screen recording.");
+                } catch (e) {
+                  alert(`Failed to download FFmpeg: ${e}\n\nYou can install it manually via:\n  winget install Gyan.FFmpeg`);
+                }
+              }
               return;
             }
             setIsSelectingRegion(true);

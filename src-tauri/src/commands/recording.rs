@@ -3,6 +3,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, State};
 
+use super::ffmpeg;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecordingConfig {
     pub x: i32,
@@ -28,18 +30,10 @@ impl RecordingState {
     }
 }
 
-/// Check if FFmpeg is available on the system
-#[tauri::command]
-pub fn check_ffmpeg() -> Result<bool, String> {
-    match Command::new("ffmpeg").arg("-version").output() {
-        Ok(output) => Ok(output.status.success()),
-        Err(_) => Ok(false),
-    }
-}
-
 /// Start screen recording using FFmpeg with GDI grab (Windows)
 #[tauri::command]
 pub fn start_recording(
+    app: AppHandle,
     config: RecordingConfig,
     state: State<'_, RecordingState>,
 ) -> Result<(), String> {
@@ -89,7 +83,10 @@ pub fn start_recording(
         config.output_path.clone(),
     ]);
 
-    let child = Command::new("ffmpeg")
+    // Resolve FFmpeg path (bundled or system)
+    let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
+
+    let child = Command::new(&ffmpeg_path)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
