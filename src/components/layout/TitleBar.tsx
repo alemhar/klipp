@@ -259,6 +259,25 @@ export function TitleBar() {
               }
               return;
             }
+            // If webcam is enabled, verify it's accessible
+            if (webcamEnabled) {
+              try {
+                const { invoke } = await import("@tauri-apps/api/core");
+                const webcams = await invoke<string[]>("list_webcams");
+                if (webcams.length === 0) {
+                  alert(
+                    "No webcam detected.\n\n" +
+                    "If you have a camera, make sure:\n" +
+                    "1. Go to Windows Settings > Privacy > Camera\n" +
+                    "2. Turn ON 'Allow desktop apps to access your camera'\n\n" +
+                    "Recording will continue without webcam."
+                  );
+                  setWebcamEnabled(false);
+                }
+              } catch {
+                setWebcamEnabled(false);
+              }
+            }
             await saveWindowState();
             setIsSelectingRegion(true);
           }}
