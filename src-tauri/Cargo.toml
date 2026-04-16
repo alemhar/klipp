@@ -32,6 +32,7 @@ windows = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Memory",
 ] }
+webview2-com = "0.38"
 
 [profile.dev]
 debug = 0

@@ -33,6 +33,8 @@ pub fn run() {
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::is_recording,
+            commands::overlay::show_overlay,
+            commands::overlay::hide_overlay,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
