@@ -89,7 +89,12 @@ export default function OverlayApp() {
     };
   }, [webcamVisible]);
 
-  // Listen for mouse-click events (ripples)
+  // Listen for mouse-click events (ripples) and detect clicks on webcam bubble
+  const webcamPosRef = useRef(webcamPos);
+  webcamPosRef.current = webcamPos;
+  const webcamVisibleRef = useRef(webcamVisible);
+  webcamVisibleRef.current = webcamVisible;
+
   useEffect(() => {
     invoke("start_mouse_hook").catch(console.error);
 
@@ -97,6 +102,37 @@ export default function OverlayApp() {
       "mouse-click",
       (event) => {
         const { x, y, button } = event.payload;
+
+        // Check if click is on the webcam bubble — if so, start drag
+        if (webcamVisibleRef.current && button === "left") {
+          const wp = webcamPosRef.current;
+          const cx = wp.x + 75; // center of 150px bubble
+          const cy = wp.y + 75;
+          const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+          if (dist <= 75) {
+            // Click is on webcam — make overlay interactive and start drag
+            dragOffset.current = { x: x - wp.x, y: y - wp.y };
+            invoke("set_overlay_interactive", { interactive: true }).catch(console.error);
+            setDraggingWebcam(true);
+
+            const handleMove = (ev: MouseEvent) => {
+              setWebcamPos({
+                x: ev.clientX - dragOffset.current.x,
+                y: ev.clientY - dragOffset.current.y,
+              });
+            };
+            const handleUp = () => {
+              setDraggingWebcam(false);
+              invoke("set_overlay_interactive", { interactive: false }).catch(console.error);
+              document.removeEventListener("mousemove", handleMove);
+              document.removeEventListener("mouseup", handleUp);
+            };
+            document.addEventListener("mousemove", handleMove);
+            document.addEventListener("mouseup", handleUp);
+            return; // Don't show ripple for webcam clicks
+          }
+        }
+
         const id = Date.now() + Math.random();
         setRipples((prev) => [...prev.slice(-9), { id, x, y, button }]);
         setTimeout(() => {
@@ -165,162 +201,140 @@ export default function OverlayApp() {
     setDrawing(null);
   }, [drawing]);
 
-  // Webcam drag handlers
-  const handleWebcamMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setDraggingWebcam(true);
-      dragOffset.current = { x: e.clientX - webcamPos.x, y: e.clientY - webcamPos.y };
-    },
-    [webcamPos]
-  );
-
-  const handleWebcamMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!draggingWebcam) return;
-      setWebcamPos({
-        x: e.clientX - dragOffset.current.x,
-        y: e.clientY - dragOffset.current.y,
-      });
-    },
-    [draggingWebcam]
-  );
-
-  const handleWebcamMouseUp = useCallback(() => {
-    if (draggingWebcam) {
-      setDraggingWebcam(false);
-    }
-  }, [draggingWebcam]);
+  // Webcam drag is handled via the mouse hook click detection above
 
   const allShapes = drawing ? [...shapes, drawing] : shapes;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        background: "transparent",
-        overflow: "hidden",
-        pointerEvents: activeTool !== "none" || draggingWebcam ? "auto" : "none",
-        cursor: draggingWebcam ? "grabbing" : activeTool !== "none" ? "crosshair" : "default",
-      }}
-      onMouseDown={(e) => { if (draggingWebcam) return; handleMouseDown(e); }}
-      onMouseMove={(e) => { handleWebcamMouseMove(e); handleMouseMove(e); }}
-      onMouseUp={() => { handleWebcamMouseUp(); handleMouseUp(); }}
-    >
-      {/* Tool indicator */}
-      {activeTool !== "none" && (
-        <div
-          style={{
-            position: "fixed",
-            top: 10,
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(0,0,0,0.7)",
-            color: "white",
-            padding: "6px 16px",
-            borderRadius: 20,
-            fontSize: 13,
-            fontFamily: "system-ui, sans-serif",
-            pointerEvents: "none",
-            zIndex: 1000,
-          }}
-        >
-          {activeTool === "rectangle" ? "Rectangle" : "Arrow"} — ESC to clear
-        </div>
-      )}
-
-      {/* Click ripples */}
-      {ripples.map((ripple) => (
-        <div
-          key={ripple.id}
-          style={{
-            position: "absolute",
-            left: ripple.x - 20,
-            top: ripple.y - 20,
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            border: `3px solid ${ripple.button === "left" ? "#facc15" : "#60a5fa"}`,
-            background:
-              ripple.button === "left"
-                ? "rgba(250, 204, 21, 0.3)"
-                : "rgba(96, 165, 250, 0.3)",
-            pointerEvents: "none",
-            animation: "ripple-expand 0.6s ease-out forwards",
-          }}
-        />
-      ))}
-
-      {/* Drawn shapes */}
-      <svg
+    <>
+      {/* Main overlay layer — click-through by default */}
+      <div
         style={{
-          position: "absolute",
+          position: "fixed",
           top: 0,
           left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
+          width: "100vw",
+          height: "100vh",
+          background: "transparent",
+          overflow: "hidden",
+          pointerEvents: activeTool !== "none" ? "auto" : "none",
+          cursor: activeTool !== "none" ? "crosshair" : "default",
         }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
       >
-        {allShapes.map((shape) => {
-          if (shape.type === "rectangle") {
-            const x = Math.min(shape.startX, shape.endX);
-            const y = Math.min(shape.startY, shape.endY);
-            const w = Math.abs(shape.endX - shape.startX);
-            const h = Math.abs(shape.endY - shape.startY);
-            return (
-              <rect
-                key={shape.id}
-                x={x}
-                y={y}
-                width={w}
-                height={h}
-                fill="rgba(255, 0, 0, 0.1)"
-                stroke="#ef4444"
-                strokeWidth={2}
-              />
-            );
-          }
-          if (shape.type === "arrow") {
-            const dx = shape.endX - shape.startX;
-            const dy = shape.endY - shape.startY;
-            const angle = Math.atan2(dy, dx);
-            const headLen = 16;
-            const x1 = shape.endX - headLen * Math.cos(angle - Math.PI / 6);
-            const y1 = shape.endY - headLen * Math.sin(angle - Math.PI / 6);
-            const x2 = shape.endX - headLen * Math.cos(angle + Math.PI / 6);
-            const y2 = shape.endY - headLen * Math.sin(angle + Math.PI / 6);
-            return (
-              <g key={shape.id}>
-                <line
-                  x1={shape.startX}
-                  y1={shape.startY}
-                  x2={shape.endX}
-                  y2={shape.endY}
+        {/* Tool indicator */}
+        {activeTool !== "none" && (
+          <div
+            style={{
+              position: "fixed",
+              top: 10,
+              left: "50%",
+              transform: "translateX(-50%)",
+              background: "rgba(0,0,0,0.7)",
+              color: "white",
+              padding: "6px 16px",
+              borderRadius: 20,
+              fontSize: 13,
+              fontFamily: "system-ui, sans-serif",
+              pointerEvents: "none",
+              zIndex: 1000,
+            }}
+          >
+            {activeTool === "rectangle" ? "Rectangle" : "Arrow"} — Ctrl+Shift+Z to clear
+          </div>
+        )}
+
+        {/* Click ripples */}
+        {ripples.map((ripple) => (
+          <div
+            key={ripple.id}
+            style={{
+              position: "absolute",
+              left: ripple.x - 20,
+              top: ripple.y - 20,
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: `3px solid ${ripple.button === "left" ? "#facc15" : "#60a5fa"}`,
+              background:
+                ripple.button === "left"
+                  ? "rgba(250, 204, 21, 0.3)"
+                  : "rgba(96, 165, 250, 0.3)",
+              pointerEvents: "none",
+              animation: "ripple-expand 0.6s ease-out forwards",
+            }}
+          />
+        ))}
+
+        {/* Drawn shapes */}
+        <svg
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+          }}
+        >
+          {allShapes.map((shape) => {
+            if (shape.type === "rectangle") {
+              const x = Math.min(shape.startX, shape.endX);
+              const y = Math.min(shape.startY, shape.endY);
+              const w = Math.abs(shape.endX - shape.startX);
+              const h = Math.abs(shape.endY - shape.startY);
+              return (
+                <rect
+                  key={shape.id}
+                  x={x}
+                  y={y}
+                  width={w}
+                  height={h}
+                  fill="rgba(255, 0, 0, 0.1)"
                   stroke="#ef4444"
                   strokeWidth={2}
                 />
-                <polygon
-                  points={`${shape.endX},${shape.endY} ${x1},${y1} ${x2},${y2}`}
-                  fill="#ef4444"
-                />
-              </g>
-            );
-          }
-          return null;
-        })}
-      </svg>
+              );
+            }
+            if (shape.type === "arrow") {
+              const dx = shape.endX - shape.startX;
+              const dy = shape.endY - shape.startY;
+              const angle = Math.atan2(dy, dx);
+              const headLen = 16;
+              const x1 = shape.endX - headLen * Math.cos(angle - Math.PI / 6);
+              const y1 = shape.endY - headLen * Math.sin(angle - Math.PI / 6);
+              const x2 = shape.endX - headLen * Math.cos(angle + Math.PI / 6);
+              const y2 = shape.endY - headLen * Math.sin(angle + Math.PI / 6);
+              return (
+                <g key={shape.id}>
+                  <line
+                    x1={shape.startX}
+                    y1={shape.startY}
+                    x2={shape.endX}
+                    y2={shape.endY}
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                  />
+                  <polygon
+                    points={`${shape.endX},${shape.endY} ${x1},${y1} ${x2},${y2}`}
+                    fill="#ef4444"
+                  />
+                </g>
+              );
+            }
+            return null;
+          })}
+        </svg>
+      </div>
 
-      {/* Webcam bubble */}
+      {/* Webcam bubble — separate from main overlay so pointer-events work independently */}
       {webcamVisible && (
         <div
-          onMouseDown={handleWebcamMouseDown}
+          onMouseDown={(e) => e.stopPropagation()}
           style={{
-            position: "absolute",
+            position: "fixed",
             left: webcamPos.x,
             top: webcamPos.y,
             width: 150,
@@ -332,6 +346,7 @@ export default function OverlayApp() {
             cursor: draggingWebcam ? "grabbing" : "grab",
             pointerEvents: "auto",
             zIndex: 500,
+            background: "black",
           }}
         >
           <video
@@ -344,6 +359,7 @@ export default function OverlayApp() {
               height: "100%",
               objectFit: "cover",
               transform: "scaleX(-1)",
+              display: "block",
               pointerEvents: "none",
             }}
           />
@@ -362,6 +378,6 @@ export default function OverlayApp() {
           }
         }
       `}</style>
-    </div>
+    </>
   );
 }
