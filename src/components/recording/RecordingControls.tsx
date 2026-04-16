@@ -1,6 +1,7 @@
 import { useEffect } from "react";
-import { Square } from "lucide-react";
+import { Square, RectangleHorizontal, MoveUpRight, Trash2 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { emit } from "@tauri-apps/api/event";
 import { useRecordingStore } from "../../stores/recordingStore";
 
 function formatTime(seconds: number): string {
@@ -21,10 +22,10 @@ export function RecordingControls() {
     const setup = async () => {
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(true);
-      await mainWindow.setSize({ type: "Logical", width: 220, height: 50 });
+      await mainWindow.setSize({ type: "Logical", width: 320, height: 50 });
       await mainWindow.setPosition({
         type: "Logical",
-        x: Math.round(screen.width / 2 - 110),
+        x: Math.round(screen.width / 2 - 160),
         y: 10,
       });
       await mainWindow.setFocus();
@@ -41,6 +42,21 @@ export function RecordingControls() {
   }, [isRecording, tick]);
 
   if (!isRecording) return null;
+
+  const toolBtnStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    border: "1px solid rgba(255,255,255,0.3)",
+    backgroundColor: "transparent",
+    cursor: "pointer",
+    color: "#ccc",
+    flexShrink: 0,
+    padding: 0,
+  };
 
   return (
     <div
@@ -84,6 +100,29 @@ export function RecordingControls() {
       >
         {formatTime(elapsedSeconds)}
       </span>
+
+      {/* Annotation tool buttons */}
+      <button
+        onClick={() => emit("overlay-set-tool", "rectangle")}
+        title="Rectangle (R)"
+        style={toolBtnStyle}
+      >
+        <RectangleHorizontal size={14} />
+      </button>
+      <button
+        onClick={() => emit("overlay-set-tool", "arrow")}
+        title="Arrow (A)"
+        style={toolBtnStyle}
+      >
+        <MoveUpRight size={14} />
+      </button>
+      <button
+        onClick={() => emit("overlay-clear")}
+        title="Clear (Esc)"
+        style={toolBtnStyle}
+      >
+        <Trash2 size={14} />
+      </button>
 
       {/* Stop button */}
       <button

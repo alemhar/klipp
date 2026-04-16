@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -9,11 +9,35 @@ interface ClickRipple {
   button: string;
 }
 
+type ToolType = "none" | "rectangle" | "arrow";
+
+interface Shape {
+  id: number;
+  type: "rectangle" | "arrow";
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 export default function OverlayApp() {
   const [ripples, setRipples] = useState<ClickRipple[]>([]);
+  const [activeTool, setActiveTool] = useState<ToolType>("none");
+  const [shapes, setShapes] = useState<Shape[]>([]);
+  const [drawing, setDrawing] = useState<Shape | null>(null);
+  const wasInteractive = useRef(false);
 
+  // Toggle overlay interactivity when tool changes
   useEffect(() => {
-    // Start the mouse hook when overlay mounts
+    const interactive = activeTool !== "none";
+    if (interactive !== wasInteractive.current) {
+      wasInteractive.current = interactive;
+      invoke("set_overlay_interactive", { interactive }).catch(console.error);
+    }
+  }, [activeTool]);
+
+  // Listen for mouse-click events (ripples)
+  useEffect(() => {
     invoke("start_mouse_hook").catch(console.error);
 
     const unlisten = listen<{ x: number; y: number; button: string }>(
@@ -21,10 +45,7 @@ export default function OverlayApp() {
       (event) => {
         const { x, y, button } = event.payload;
         const id = Date.now() + Math.random();
-
         setRipples((prev) => [...prev.slice(-9), { id, x, y, button }]);
-
-        // Auto-remove after animation completes
         setTimeout(() => {
           setRipples((prev) => prev.filter((r) => r.id !== id));
         }, 600);
@@ -37,6 +58,79 @@ export default function OverlayApp() {
     };
   }, []);
 
+  // Listen for tool and clear events from the main app
+  useEffect(() => {
+    const unlistenTool = listen<string>("overlay-set-tool", (event) => {
+      setActiveTool(event.payload as ToolType);
+    });
+
+    const unlistenClear = listen("overlay-clear", () => {
+      setShapes([]);
+      setDrawing(null);
+      setActiveTool("none");
+    });
+
+    return () => {
+      unlistenTool.then((fn) => fn());
+      unlistenClear.then((fn) => fn());
+    };
+  }, []);
+
+  // Drawing handlers
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (activeTool === "none") return;
+      const shape: Shape = {
+        id: Date.now(),
+        type: activeTool,
+        startX: e.clientX,
+        startY: e.clientY,
+        endX: e.clientX,
+        endY: e.clientY,
+      };
+      setDrawing(shape);
+    },
+    [activeTool]
+  );
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!drawing) return;
+      setDrawing({ ...drawing, endX: e.clientX, endY: e.clientY });
+    },
+    [drawing]
+  );
+
+  const handleMouseUp = useCallback(() => {
+    if (!drawing) return;
+    // Only add if the shape has some size
+    const dx = Math.abs(drawing.endX - drawing.startX);
+    const dy = Math.abs(drawing.endY - drawing.startY);
+    if (dx > 5 || dy > 5) {
+      setShapes((prev) => [...prev, drawing]);
+    }
+    setDrawing(null);
+  }, [drawing]);
+
+  // Keyboard shortcuts directly on the overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShapes([]);
+        setDrawing(null);
+        setActiveTool("none");
+      } else if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.altKey) {
+        setActiveTool((t) => (t === "rectangle" ? "none" : "rectangle"));
+      } else if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.altKey) {
+        setActiveTool((t) => (t === "arrow" ? "none" : "arrow"));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const allShapes = drawing ? [...shapes, drawing] : shapes;
+
   return (
     <div
       style={{
@@ -46,10 +140,37 @@ export default function OverlayApp() {
         width: "100vw",
         height: "100vh",
         background: "transparent",
-        pointerEvents: "none",
         overflow: "hidden",
+        pointerEvents: activeTool !== "none" ? "auto" : "none",
+        cursor: activeTool !== "none" ? "crosshair" : "default",
       }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
     >
+      {/* Tool indicator */}
+      {activeTool !== "none" && (
+        <div
+          style={{
+            position: "fixed",
+            top: 10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(0,0,0,0.7)",
+            color: "white",
+            padding: "6px 16px",
+            borderRadius: 20,
+            fontSize: 13,
+            fontFamily: "system-ui, sans-serif",
+            pointerEvents: "none",
+            zIndex: 1000,
+          }}
+        >
+          {activeTool === "rectangle" ? "Rectangle" : "Arrow"} — ESC to clear
+        </div>
+      )}
+
+      {/* Click ripples */}
       {ripples.map((ripple) => (
         <div
           key={ripple.id}
@@ -70,6 +191,66 @@ export default function OverlayApp() {
           }}
         />
       ))}
+
+      {/* Drawn shapes */}
+      <svg
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+        }}
+      >
+        {allShapes.map((shape) => {
+          if (shape.type === "rectangle") {
+            const x = Math.min(shape.startX, shape.endX);
+            const y = Math.min(shape.startY, shape.endY);
+            const w = Math.abs(shape.endX - shape.startX);
+            const h = Math.abs(shape.endY - shape.startY);
+            return (
+              <rect
+                key={shape.id}
+                x={x}
+                y={y}
+                width={w}
+                height={h}
+                fill="rgba(255, 0, 0, 0.1)"
+                stroke="#ef4444"
+                strokeWidth={2}
+              />
+            );
+          }
+          if (shape.type === "arrow") {
+            const dx = shape.endX - shape.startX;
+            const dy = shape.endY - shape.startY;
+            const angle = Math.atan2(dy, dx);
+            const headLen = 16;
+            const x1 = shape.endX - headLen * Math.cos(angle - Math.PI / 6);
+            const y1 = shape.endY - headLen * Math.sin(angle - Math.PI / 6);
+            const x2 = shape.endX - headLen * Math.cos(angle + Math.PI / 6);
+            const y2 = shape.endY - headLen * Math.sin(angle + Math.PI / 6);
+            return (
+              <g key={shape.id}>
+                <line
+                  x1={shape.startX}
+                  y1={shape.startY}
+                  x2={shape.endX}
+                  y2={shape.endY}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                />
+                <polygon
+                  points={`${shape.endX},${shape.endY} ${x1},${y1} ${x2},${y2}`}
+                  fill="#ef4444"
+                />
+              </g>
+            );
+          }
+          return null;
+        })}
+      </svg>
 
       <style>{`
         @keyframes ripple-expand {

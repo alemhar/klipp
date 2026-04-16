@@ -3,6 +3,8 @@ mod commands;
 mod settings;
 mod tray;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -16,6 +18,17 @@ pub fn run() {
         .setup(|app| {
             tray::create_tray(app)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // When the main window is closed, clean up overlay and mouse hook
+            if let tauri::WindowEvent::Destroyed = event {
+                if window.label() == "main" {
+                    let _ = commands::overlay::stop_mouse_hook();
+                    if let Some(overlay) = window.app_handle().get_webview_window("overlay") {
+                        let _ = overlay.close();
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::capture::capture_fullscreen,
@@ -35,6 +48,7 @@ pub fn run() {
             commands::recording::is_recording,
             commands::overlay::show_overlay,
             commands::overlay::hide_overlay,
+            commands::overlay::set_overlay_interactive,
             commands::overlay::start_mouse_hook,
             commands::overlay::stop_mouse_hook,
         ])

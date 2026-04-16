@@ -136,6 +136,18 @@ pub async fn hide_overlay(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+// ─── Overlay interactivity ───
+
+#[tauri::command]
+pub fn set_overlay_interactive(app: AppHandle, interactive: bool) -> Result<(), String> {
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        overlay
+            .set_ignore_cursor_events(!interactive)
+            .map_err(|e: tauri::Error| e.to_string())?;
+    }
+    Ok(())
+}
+
 // ─── Mouse hook commands ───
 
 #[tauri::command]

@@ -83,6 +83,8 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   startRecording: async (config) => {
     try {
       await invoke("start_recording", { config });
+      // Show overlay and start mouse hook for click indicators
+      await invoke("show_overlay").catch(console.error);
       set({ isRecording: true, elapsedSeconds: 0, config });
     } catch (e) {
       console.error("Failed to start recording:", e);
@@ -93,6 +95,8 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   stopRecording: async () => {
     try {
       await invoke("stop_recording");
+      // Clean up overlay and mouse hook
+      await invoke("hide_overlay").catch(console.error);
 
       // Restore window
       const saved = get().savedWindowState;
