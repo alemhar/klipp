@@ -14,30 +14,13 @@ export type ShapeType = "rectangle" | "ellipse" | "arrow" | "line";
 
 export interface CanvasObject {
   id: string;
-  type: ToolType | ShapeType;
+  type: "pen" | "highlighter" | "shape";
   x: number;
   y: number;
   width?: number;
   height?: number;
   rotation?: number;
   props: Record<string, unknown>;
-}
-
-export interface TextObject extends CanvasObject {
-  type: "text";
-  props: {
-    text: string;
-    fontSize: number;
-    fontFamily: string;
-    fontStyle: string;
-    fill: string;
-    width: number;
-  };
-}
-
-export interface DrawingPoint {
-  x: number;
-  y: number;
 }
 
 export interface DrawingObject extends CanvasObject {
@@ -47,5 +30,18 @@ export interface DrawingObject extends CanvasObject {
     stroke: string;
     strokeWidth: number;
     opacity: number;
+  };
+}
+
+export interface ShapeObject extends CanvasObject {
+  type: "shape";
+  props: {
+    shapeType: ShapeType;
+    stroke: string;
+    strokeWidth: number;
+    fill: string;
+    opacity: number;
+    // For arrow/line: start and end points relative to x,y
+    points?: number[];
   };
 }

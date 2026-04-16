@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { TitleBar } from "./components/layout/TitleBar";
 import { Toolbar } from "./components/layout/Toolbar";
 import { StatusBar } from "./components/layout/StatusBar";
+import { ToolOptionsBar } from "./components/layout/ToolOptionsBar";
 import { AnnotationCanvas } from "./components/canvas/AnnotationCanvas";
 import { CaptureOverlay } from "./components/capture/CaptureOverlay";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
@@ -59,13 +60,27 @@ function App() {
 
   // Keyboard shortcuts
   useEffect(() => {
+    const { setActiveTool } = useUIStore.getState();
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
       if (e.ctrlKey && e.key === "z") {
         e.preventDefault();
         undo();
       } else if (e.ctrlKey && e.key === "y") {
         e.preventDefault();
         redo();
+      } else if (!e.ctrlKey && !e.altKey) {
+        // Tool shortcuts
+        switch (e.key.toLowerCase()) {
+          case "v": setActiveTool("select"); break;
+          case "p": setActiveTool("pen"); break;
+          case "h": setActiveTool("highlighter"); break;
+          case "e": setActiveTool("eraser"); break;
+          case "s": setActiveTool("shape"); break;
+          case "t": setActiveTool("text"); break;
+        }
       }
     };
 
@@ -84,6 +99,7 @@ function App() {
     >
       <TitleBar />
       <Toolbar />
+      <ToolOptionsBar />
       <AnnotationCanvas />
       <StatusBar />
 

@@ -17,7 +17,7 @@ import {
 import { useUIStore } from "../../stores/uiStore";
 import { useCanvasStore } from "../../stores/canvasStore";
 import { useCaptureStore } from "../../stores/captureStore";
-import { saveImageToFile, copyImageToClipboard } from "../../lib/export";
+import { saveImageToFile, copyImageToClipboard, getStageBase64 } from "../../lib/export";
 import type { ToolType } from "../../types/canvas";
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from "../../lib/constants";
 
@@ -74,17 +74,19 @@ function Separator() {
 }
 
 export function Toolbar() {
-  const { undo, redo, past, future, zoom, setZoom } = useCanvasStore();
+  const { undo, redo, past, future, zoom, setZoom, stageRef } = useCanvasStore();
   const { capturedImage } = useCaptureStore();
 
   const handleSave = async () => {
     if (!capturedImage) return;
-    await saveImageToFile(capturedImage.base64);
+    const base64 = getStageBase64(stageRef, capturedImage.base64);
+    if (base64) await saveImageToFile(base64);
   };
 
   const handleCopy = async () => {
     if (!capturedImage) return;
-    await copyImageToClipboard(capturedImage.base64);
+    const base64 = getStageBase64(stageRef, capturedImage.base64);
+    if (base64) await copyImageToClipboard(base64);
   };
 
   const handleZoomIn = () => setZoom(Math.min(zoom + ZOOM_STEP, ZOOM_MAX));

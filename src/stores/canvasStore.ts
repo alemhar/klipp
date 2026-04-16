@@ -1,14 +1,12 @@
 import { create } from "zustand";
-import { enableMapSet, produce } from "immer";
 import type { CanvasObject } from "../types/canvas";
-
-enableMapSet();
 
 interface CanvasState {
   objects: CanvasObject[];
   past: CanvasObject[][];
   future: CanvasObject[][];
   zoom: number;
+  stageRef: any | null;
 
   addObject: (obj: CanvasObject) => void;
   updateObject: (id: string, changes: Partial<CanvasObject>) => void;
@@ -17,72 +15,76 @@ interface CanvasState {
   undo: () => void;
   redo: () => void;
   setZoom: (zoom: number) => void;
+  setStageRef: (ref: any) => void;
 }
 
-export const useCanvasStore = create<CanvasState>((set) => ({
+export const useCanvasStore = create<CanvasState>((set, get) => ({
   objects: [],
   past: [],
   future: [],
   zoom: 1,
+  stageRef: null,
 
-  addObject: (obj) =>
-    set(
-      produce((state: CanvasState) => {
-        state.past.push([...state.objects]);
-        state.future = [];
-        state.objects.push(obj);
-      })
-    ),
+  addObject: (obj) => {
+    const { objects, past } = get();
+    set({
+      past: [...past, objects],
+      future: [],
+      objects: [...objects, obj],
+    });
+  },
 
-  updateObject: (id, changes) =>
-    set(
-      produce((state: CanvasState) => {
-        state.past.push([...state.objects]);
-        state.future = [];
-        const index = state.objects.findIndex((o) => o.id === id);
-        if (index !== -1) {
-          state.objects[index] = { ...state.objects[index], ...changes };
-        }
-      })
-    ),
+  updateObject: (id, changes) => {
+    const { objects, past } = get();
+    set({
+      past: [...past, objects],
+      future: [],
+      objects: objects.map((o) =>
+        o.id === id ? { ...o, ...changes } : o
+      ),
+    });
+  },
 
-  removeObject: (id) =>
-    set(
-      produce((state: CanvasState) => {
-        state.past.push([...state.objects]);
-        state.future = [];
-        state.objects = state.objects.filter((o) => o.id !== id);
-      })
-    ),
+  removeObject: (id) => {
+    const { objects, past } = get();
+    set({
+      past: [...past, objects],
+      future: [],
+      objects: objects.filter((o) => o.id !== id),
+    });
+  },
 
-  clearAll: () =>
-    set(
-      produce((state: CanvasState) => {
-        state.past.push([...state.objects]);
-        state.future = [];
-        state.objects = [];
-      })
-    ),
+  clearAll: () => {
+    const { objects, past } = get();
+    set({
+      past: [...past, objects],
+      future: [],
+      objects: [],
+    });
+  },
 
-  undo: () =>
-    set(
-      produce((state: CanvasState) => {
-        if (state.past.length === 0) return;
-        const previous = state.past.pop()!;
-        state.future.push([...state.objects]);
-        state.objects = previous;
-      })
-    ),
+  undo: () => {
+    const { objects, past, future } = get();
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    set({
+      past: past.slice(0, -1),
+      future: [...future, objects],
+      objects: previous,
+    });
+  },
 
-  redo: () =>
-    set(
-      produce((state: CanvasState) => {
-        if (state.future.length === 0) return;
-        const next = state.future.pop()!;
-        state.past.push([...state.objects]);
-        state.objects = next;
-      })
-    ),
+  redo: () => {
+    const { objects, past, future } = get();
+    if (future.length === 0) return;
+    const next = future[future.length - 1];
+    set({
+      past: [...past, objects],
+      future: future.slice(0, -1),
+      objects: next,
+    });
+  },
 
   setZoom: (zoom) => set({ zoom }),
+  setStageRef: (ref) => set({ stageRef: ref }),
 }));
