@@ -1,27 +1,88 @@
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+
+interface ClickRipple {
+  id: number;
+  x: number;
+  y: number;
+  button: string;
+}
+
 export default function OverlayApp() {
+  const [ripples, setRipples] = useState<ClickRipple[]>([]);
+
+  useEffect(() => {
+    // Start the mouse hook when overlay mounts
+    invoke("start_mouse_hook").catch(console.error);
+
+    const unlisten = listen<{ x: number; y: number; button: string }>(
+      "mouse-click",
+      (event) => {
+        const { x, y, button } = event.payload;
+        const id = Date.now() + Math.random();
+
+        setRipples((prev) => [...prev.slice(-9), { id, x, y, button }]);
+
+        // Auto-remove after animation completes
+        setTimeout(() => {
+          setRipples((prev) => prev.filter((r) => r.id !== id));
+        }, 600);
+      }
+    );
+
+    return () => {
+      invoke("stop_mouse_hook").catch(console.error);
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   return (
     <div
       style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
         width: "100vw",
         height: "100vh",
         background: "transparent",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         pointerEvents: "none",
+        overflow: "hidden",
       }}
     >
-      {/* Phase 1 proof-of-concept: a red circle visible over the desktop */}
-      <div
-        style={{
-          width: 120,
-          height: 120,
-          borderRadius: "50%",
-          backgroundColor: "rgba(255, 0, 0, 0.7)",
-          border: "3px solid red",
-          pointerEvents: "none",
-        }}
-      />
+      {ripples.map((ripple) => (
+        <div
+          key={ripple.id}
+          style={{
+            position: "absolute",
+            left: ripple.x - 20,
+            top: ripple.y - 20,
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            border: `3px solid ${ripple.button === "left" ? "#facc15" : "#60a5fa"}`,
+            background:
+              ripple.button === "left"
+                ? "rgba(250, 204, 21, 0.3)"
+                : "rgba(96, 165, 250, 0.3)",
+            pointerEvents: "none",
+            animation: "ripple-expand 0.6s ease-out forwards",
+          }}
+        />
+      ))}
+
+      <style>{`
+        @keyframes ripple-expand {
+          0% {
+            transform: scale(1);
+            opacity: 1;
+          }
+          100% {
+            transform: scale(2.5);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }

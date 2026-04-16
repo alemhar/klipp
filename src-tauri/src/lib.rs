@@ -35,6 +35,8 @@ pub fn run() {
             commands::recording::is_recording,
             commands::overlay::show_overlay,
             commands::overlay::hide_overlay,
+            commands::overlay::start_mouse_hook,
+            commands::overlay::stop_mouse_hook,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,5 +1,55 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use std::sync::Mutex;
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+
+#[cfg(windows)]
+use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+#[cfg(windows)]
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, MSLLHOOKSTRUCT,
+    WH_MOUSE_LL, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN,
+};
+
+static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
+static MOUSE_HOOK: Mutex<Option<isize>> = Mutex::new(None);
+static APP_HANDLE: Mutex<Option<AppHandle>> = Mutex::new(None);
+
+#[derive(Clone, serde::Serialize)]
+struct ClickEvent {
+    x: i32,
+    y: i32,
+    button: String,
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+    if n_code >= 0 && HOOK_ACTIVE.load(Ordering::Relaxed) {
+        let button = match w_param.0 as u32 {
+            WM_LBUTTONDOWN => Some("left"),
+            WM_RBUTTONDOWN => Some("right"),
+            WM_MBUTTONDOWN => Some("middle"),
+            _ => None,
+        };
+
+        if let Some(button) = button {
+            let mouse_struct = unsafe { &*(l_param.0 as *const MSLLHOOKSTRUCT) };
+            let event = ClickEvent {
+                x: mouse_struct.pt.x,
+                y: mouse_struct.pt.y,
+                button: button.to_string(),
+            };
+
+            if let Some(app) = APP_HANDLE.lock().ok().and_then(|g| g.clone()) {
+                let _ = app.emit("mouse-click", event);
+            }
+        }
+    }
+
+    unsafe { CallNextHookEx(None, n_code, w_param, l_param) }
+}
+
+// ─── Overlay window commands ───
 
 #[tauri::command]
 pub async fn show_overlay(app: AppHandle) -> Result<(), String> {
@@ -10,8 +60,6 @@ pub async fn show_overlay(app: AppHandle) -> Result<(), String> {
     }
 
     // Create the overlay window on the main thread via channel to avoid deadlocks.
-    // Async tauri commands run on a thread pool, but window creation must happen
-    // on the main thread.
     let (tx, rx) = mpsc::channel();
     let app_clone = app.clone();
 
@@ -85,5 +133,50 @@ pub async fn hide_overlay(app: AppHandle) -> Result<(), String> {
         overlay.hide().map_err(|e: tauri::Error| e.to_string())?;
         overlay.close().map_err(|e: tauri::Error| e.to_string())?;
     }
+    Ok(())
+}
+
+// ─── Mouse hook commands ───
+
+#[tauri::command]
+pub fn start_mouse_hook(app: AppHandle) -> Result<(), String> {
+    if HOOK_ACTIVE.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+
+    *APP_HANDLE.lock().map_err(|e| e.to_string())? = Some(app);
+
+    #[cfg(windows)]
+    {
+        let hook = unsafe {
+            SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), None, 0)
+                .map_err(|e| format!("Failed to set mouse hook: {}", e))?
+        };
+
+        *MOUSE_HOOK.lock().map_err(|e| e.to_string())? = Some(hook.0 as isize);
+    }
+
+    HOOK_ACTIVE.store(true, Ordering::Relaxed);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_mouse_hook() -> Result<(), String> {
+    if !HOOK_ACTIVE.load(Ordering::Relaxed) {
+        return Ok(());
+    }
+
+    HOOK_ACTIVE.store(false, Ordering::Relaxed);
+
+    #[cfg(windows)]
+    {
+        if let Some(hook_id) = MOUSE_HOOK.lock().map_err(|e| e.to_string())?.take() {
+            unsafe {
+                let _ = UnhookWindowsHookEx(HHOOK(hook_id as *mut _));
+            }
+        }
+    }
+
+    *APP_HANDLE.lock().map_err(|e| e.to_string())? = None;
     Ok(())
 }
