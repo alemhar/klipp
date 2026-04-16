@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   MousePointer2,
   Pen,
@@ -7,6 +8,7 @@ import {
   Type,
   Crop,
   Smile,
+  ImagePlus,
   Undo2,
   Redo2,
   Save,
@@ -18,6 +20,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { useCanvasStore } from "../../stores/canvasStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { saveImageToFile, copyImageToClipboard, getStageBase64 } from "../../lib/export";
+import type { ImageOverlayObject } from "../../types/canvas";
 import type { ToolType } from "../../types/canvas";
 import { ZOOM_MIN, ZOOM_MAX, ZOOM_STEP } from "../../lib/constants";
 
@@ -74,18 +77,67 @@ function Separator() {
 }
 
 export function Toolbar() {
-  const { undo, redo, past, future, zoom, setZoom, stageRef } = useCanvasStore();
+  const { undo, redo, past, future, zoom, setZoom, stageRef, addObject } = useCanvasStore();
   const { capturedImage } = useCaptureStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportImage = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new window.Image();
+      img.onload = () => {
+        const overlayObj: ImageOverlayObject = {
+          id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          type: "image-overlay",
+          x: 100,
+          y: 100,
+          width: Math.min(img.width, 300),
+          height: Math.min(img.height, 300),
+          props: { src: dataUrl },
+        };
+        addObject(overlayObj);
+        useUIStore.getState().setActiveTool("select");
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  };
+
+  // Calculate the image region on the canvas for export
+  const getImageRegion = () => {
+    if (!capturedImage) return undefined;
+    const containerEl = stageRef?.current?.container()?.parentElement;
+    if (!containerEl) return undefined;
+    const containerWidth = containerEl.clientWidth;
+    const containerHeight = containerEl.clientHeight;
+    return {
+      x: (containerWidth / zoom - capturedImage.width) / 2,
+      y: (containerHeight / zoom - capturedImage.height) / 2,
+      width: capturedImage.width,
+      height: capturedImage.height,
+    };
+  };
 
   const handleSave = async () => {
     if (!capturedImage) return;
-    const base64 = getStageBase64(stageRef, capturedImage.base64);
+    const region = getImageRegion();
+    const base64 = getStageBase64(stageRef, capturedImage.base64, region);
     if (base64) await saveImageToFile(base64);
   };
 
   const handleCopy = async () => {
     if (!capturedImage) return;
-    const base64 = getStageBase64(stageRef, capturedImage.base64);
+    const region = getImageRegion();
+    const base64 = getStageBase64(stageRef, capturedImage.base64, region);
     if (base64) await copyImageToClipboard(base64);
   };
 
@@ -115,6 +167,31 @@ export function Toolbar() {
       <ToolButton tool="text" icon={<Type size={18} />} label="Text (T)" />
       <ToolButton tool="crop" icon={<Crop size={18} />} label="Crop (C)" />
       <ToolButton tool="emoji" icon={<Smile size={18} />} label="Emoji" />
+      <button
+        title="Import Image"
+        onClick={handleImportImage}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 36,
+          height: 36,
+          borderRadius: 6,
+          border: "none",
+          cursor: "pointer",
+          backgroundColor: "transparent",
+          color: "var(--text-primary)",
+        }}
+      >
+        <ImagePlus size={18} />
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={handleFileSelected}
+      />
 
       <Separator />
 

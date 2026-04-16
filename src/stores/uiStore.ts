@@ -9,6 +9,9 @@ import {
   DEFAULT_HIGHLIGHTER_OPACITY,
   DEFAULT_SHAPE_COLOR,
   DEFAULT_SHAPE_WIDTH,
+  DEFAULT_TEXT_SIZE,
+  DEFAULT_TEXT_FONT,
+  DEFAULT_TEXT_COLOR,
 } from "../lib/constants";
 
 interface ToolOptions {
@@ -18,6 +21,13 @@ interface ToolOptions {
   shapeType: ShapeType;
   fillColor: string;
   filled: boolean;
+  // Text options
+  fontSize: number;
+  fontFamily: string;
+  fontStyle: string;
+  textDecoration: string;
+  textColor: string;
+  textAlign: string;
 }
 
 interface UIState {
@@ -43,6 +53,12 @@ const defaultToolOptions: ToolOptions = {
   shapeType: "rectangle",
   fillColor: "transparent",
   filled: false,
+  fontSize: DEFAULT_TEXT_SIZE,
+  fontFamily: DEFAULT_TEXT_FONT,
+  fontStyle: "normal",
+  textDecoration: "",
+  textColor: DEFAULT_TEXT_COLOR,
+  textAlign: "left",
 };
 
 export const useUIStore = create<UIState>((set) => ({
@@ -70,6 +86,10 @@ export const useUIStore = create<UIState>((set) => ({
       overrides.strokeColor = DEFAULT_SHAPE_COLOR;
       overrides.strokeWidth = DEFAULT_SHAPE_WIDTH;
       overrides.opacity = 1;
+    } else if (tool === "text") {
+      overrides.textColor = DEFAULT_TEXT_COLOR;
+      overrides.fontSize = DEFAULT_TEXT_SIZE;
+      overrides.fontFamily = DEFAULT_TEXT_FONT;
     }
     set((state) => ({
       activeTool: tool,

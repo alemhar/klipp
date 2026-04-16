@@ -13,7 +13,15 @@ import { Camera } from "lucide-react";
 import { useCanvasStore } from "../../stores/canvasStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useUIStore } from "../../stores/uiStore";
-import type { CanvasObject, DrawingObject, ShapeObject } from "../../types/canvas";
+import { TextNode } from "./TextNode";
+import { ImageOverlayNode } from "./ImageOverlayNode";
+import type {
+  CanvasObject,
+  DrawingObject,
+  ShapeObject,
+  TextObject,
+  ImageOverlayObject,
+} from "../../types/canvas";
 
 function generateId() {
   return `obj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -132,6 +140,63 @@ function ShapeNode({
   );
 }
 
+function ShapePreview({ shape }: { shape: ShapeObject }) {
+  const commonProps = {
+    stroke: shape.props.stroke,
+    strokeWidth: shape.props.strokeWidth,
+    opacity: shape.props.opacity,
+    fill: shape.props.fill || "transparent",
+    dash: [5, 5],
+  };
+
+  switch (shape.props.shapeType) {
+    case "rectangle":
+      return (
+        <Rect
+          x={shape.x}
+          y={shape.y}
+          width={shape.width || 0}
+          height={shape.height || 0}
+          {...commonProps}
+        />
+      );
+    case "ellipse":
+      return (
+        <Ellipse
+          x={(shape.x || 0) + (shape.width || 0) / 2}
+          y={(shape.y || 0) + (shape.height || 0) / 2}
+          radiusX={(shape.width || 0) / 2}
+          radiusY={(shape.height || 0) / 2}
+          {...commonProps}
+        />
+      );
+    case "arrow":
+      return (
+        <Arrow
+          x={shape.x}
+          y={shape.y}
+          points={shape.props.points || [0, 0, 0, 0]}
+          pointerLength={10}
+          pointerWidth={10}
+          {...commonProps}
+          fill={shape.props.stroke}
+        />
+      );
+    case "line":
+      return (
+        <Line
+          x={shape.x}
+          y={shape.y}
+          points={shape.props.points || [0, 0, 0, 0]}
+          lineCap="round"
+          {...commonProps}
+        />
+      );
+    default:
+      return null;
+  }
+}
+
 export function AnnotationCanvas() {
   const stageRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -142,15 +207,9 @@ export function AnnotationCanvas() {
   const [shapeStart, setShapeStart] = useState<{ x: number; y: number } | null>(null);
   const [previewShape, setPreviewShape] = useState<ShapeObject | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   const { zoom, objects, addObject, removeObject, setZoom, setStageRef } = useCanvasStore();
-
-  // Register stage ref so other components (Toolbar) can export the canvas
-  useEffect(() => {
-    if (stageRef.current) {
-      setStageRef(stageRef);
-    }
-  }, [image, setStageRef]);
   const { capturedImage } = useCaptureStore();
   const { activeTool, toolOptions } = useUIStore();
 
@@ -180,6 +239,13 @@ export function AnnotationCanvas() {
     img.onload = () => setImage(img);
     img.src = `data:image/png;base64,${capturedImage.base64}`;
   }, [capturedImage]);
+
+  // Register stage ref
+  useEffect(() => {
+    if (stageRef.current) {
+      setStageRef(stageRef);
+    }
+  }, [image, setStageRef]);
 
   // Clear selection when switching tools
   useEffect(() => {
@@ -237,12 +303,33 @@ export function AnnotationCanvas() {
           points: [0, 0, 0, 0],
         },
       });
+    } else if (activeTool === "text") {
+      // Create a new text object and immediately open editor (Paint-like UX)
+      const newId = generateId();
+      const textObj: TextObject = {
+        id: newId,
+        type: "text",
+        x: pos.x,
+        y: pos.y,
+        width: 200,
+        props: {
+          text: "",
+          fontSize: toolOptions.fontSize,
+          fontFamily: toolOptions.fontFamily,
+          fontStyle: toolOptions.fontStyle,
+          textDecoration: toolOptions.textDecoration,
+          fill: toolOptions.textColor,
+          align: toolOptions.textAlign,
+        },
+      };
+      addObject(textObj);
+      setSelectedId(newId);
+      setEditingTextId(newId);
     } else if (activeTool === "eraser") {
-      // Check if clicking on an object
       const stage = stageRef.current;
       if (!stage) return;
       const clickedShape = stage.getIntersection(stage.getPointerPosition());
-      if (clickedShape && clickedShape.id()) {
+      if (clickedShape && clickedShape.id() && clickedShape.id() !== "background-image") {
         removeObject(clickedShape.id());
       }
     } else if (activeTool === "select") {
@@ -255,7 +342,7 @@ export function AnnotationCanvas() {
         setSelectedId(null);
       }
     }
-  }, [activeTool, toolOptions, getPointerPos, removeObject]);
+  }, [activeTool, toolOptions, getPointerPos, addObject, removeObject]);
 
   const handleMouseMove = useCallback(() => {
     const pos = getPointerPos();
@@ -327,11 +414,12 @@ export function AnnotationCanvas() {
     switch (activeTool) {
       case "pen":
       case "highlighter":
-        return "crosshair";
-      case "eraser":
-        return "pointer";
       case "shape":
         return "crosshair";
+      case "text":
+        return "text";
+      case "eraser":
+        return "pointer";
       case "select":
         return "default";
       default:
@@ -356,6 +444,7 @@ export function AnnotationCanvas() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        position: "relative",
       }}
     >
       {capturedImage && image ? (
@@ -404,6 +493,34 @@ export function AnnotationCanvas() {
                   />
                 );
               }
+              if (obj.type === "text") {
+                return (
+                  <TextNode
+                    key={obj.id}
+                    obj={obj as TextObject}
+                    isSelected={selectedId === obj.id}
+                    autoEdit={editingTextId === obj.id}
+                    onSelect={() => {
+                      if (activeTool === "select") setSelectedId(obj.id);
+                    }}
+                    onEditDone={() => setEditingTextId(null)}
+                    zoom={zoom}
+                    stageContainer={containerRef.current}
+                  />
+                );
+              }
+              if (obj.type === "image-overlay") {
+                return (
+                  <ImageOverlayNode
+                    key={obj.id}
+                    obj={obj as ImageOverlayObject}
+                    isSelected={selectedId === obj.id}
+                    onSelect={() => {
+                      if (activeTool === "select") setSelectedId(obj.id);
+                    }}
+                  />
+                );
+              }
               return null;
             })}
 
@@ -424,9 +541,7 @@ export function AnnotationCanvas() {
             )}
 
             {/* Shape preview */}
-            {previewShape && (
-              <ShapePreview shape={previewShape} />
-            )}
+            {previewShape && <ShapePreview shape={previewShape} />}
           </Layer>
         </Stage>
       ) : (
@@ -459,61 +574,4 @@ export function AnnotationCanvas() {
       )}
     </div>
   );
-}
-
-function ShapePreview({ shape }: { shape: ShapeObject }) {
-  const commonProps = {
-    stroke: shape.props.stroke,
-    strokeWidth: shape.props.strokeWidth,
-    opacity: shape.props.opacity,
-    fill: shape.props.fill || "transparent",
-    dash: [5, 5],
-  };
-
-  switch (shape.props.shapeType) {
-    case "rectangle":
-      return (
-        <Rect
-          x={shape.x}
-          y={shape.y}
-          width={shape.width || 0}
-          height={shape.height || 0}
-          {...commonProps}
-        />
-      );
-    case "ellipse":
-      return (
-        <Ellipse
-          x={(shape.x || 0) + (shape.width || 0) / 2}
-          y={(shape.y || 0) + (shape.height || 0) / 2}
-          radiusX={(shape.width || 0) / 2}
-          radiusY={(shape.height || 0) / 2}
-          {...commonProps}
-        />
-      );
-    case "arrow":
-      return (
-        <Arrow
-          x={shape.x}
-          y={shape.y}
-          points={shape.props.points || [0, 0, 0, 0]}
-          pointerLength={10}
-          pointerWidth={10}
-          {...commonProps}
-          fill={shape.props.stroke}
-        />
-      );
-    case "line":
-      return (
-        <Line
-          x={shape.x}
-          y={shape.y}
-          points={shape.props.points || [0, 0, 0, 0]}
-          lineCap="round"
-          {...commonProps}
-        />
-      );
-    default:
-      return null;
-  }
 }

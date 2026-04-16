@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useCanvasStore } from "../../stores/canvasStore";
 import { copyImageToClipboard } from "../../lib/export";
 import type { CaptureResult } from "../../types/capture";
 
@@ -130,6 +131,7 @@ export function CaptureOverlay() {
 
       await restoreMainWindow();
       setIsCaptureMode(false);
+      useCanvasStore.getState().clearAll();
       setCapturedImage(result);
 
       if (settings.autoCopyToClipboard) {

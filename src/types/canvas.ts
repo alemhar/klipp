@@ -7,23 +7,24 @@ export type ToolType =
   | "text"
   | "crop"
   | "emoji"
+  | "image-overlay"
   | "ruler"
   | "protractor";
 
 export type ShapeType = "rectangle" | "ellipse" | "arrow" | "line";
 
-export interface CanvasObject {
+export type CanvasObject = DrawingObject | ShapeObject | TextObject | ImageOverlayObject;
+
+export interface BaseObject {
   id: string;
-  type: "pen" | "highlighter" | "shape";
   x: number;
   y: number;
   width?: number;
   height?: number;
   rotation?: number;
-  props: Record<string, unknown>;
 }
 
-export interface DrawingObject extends CanvasObject {
+export interface DrawingObject extends BaseObject {
   type: "pen" | "highlighter";
   props: {
     points: number[];
@@ -33,7 +34,7 @@ export interface DrawingObject extends CanvasObject {
   };
 }
 
-export interface ShapeObject extends CanvasObject {
+export interface ShapeObject extends BaseObject {
   type: "shape";
   props: {
     shapeType: ShapeType;
@@ -41,7 +42,26 @@ export interface ShapeObject extends CanvasObject {
     strokeWidth: number;
     fill: string;
     opacity: number;
-    // For arrow/line: start and end points relative to x,y
     points?: number[];
+  };
+}
+
+export interface TextObject extends BaseObject {
+  type: "text";
+  props: {
+    text: string;
+    fontSize: number;
+    fontFamily: string;
+    fontStyle: string; // "normal", "bold", "italic", "bold italic"
+    textDecoration: string; // "", "underline"
+    fill: string;
+    align: string;
+  };
+}
+
+export interface ImageOverlayObject extends BaseObject {
+  type: "image-overlay";
+  props: {
+    src: string; // data URL of the imported image
   };
 }

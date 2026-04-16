@@ -7,16 +7,38 @@ import { ToolOptionsBar } from "./components/layout/ToolOptionsBar";
 import { AnnotationCanvas } from "./components/canvas/AnnotationCanvas";
 import { CaptureOverlay } from "./components/capture/CaptureOverlay";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
+import { EmojiPicker } from "./components/canvas/EmojiPicker";
 import { useUIStore } from "./stores/uiStore";
 import { useCaptureStore } from "./stores/captureStore";
 import { useCanvasStore } from "./stores/canvasStore";
+import type { TextObject } from "./types/canvas";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useGlobalShortcut } from "./hooks/useGlobalShortcut";
 
 function App() {
-  const { isCaptureMode, setIsCaptureMode, showSettings } = useUIStore();
+  const { isCaptureMode, setIsCaptureMode, showSettings, activeTool } = useUIStore();
   const { setCapturedImage } = useCaptureStore();
-  const { undo, redo } = useCanvasStore();
+  const { undo, redo, addObject } = useCanvasStore();
+
+  const handleEmojiSelect = (emoji: string) => {
+    const emojiObj: TextObject = {
+      id: `obj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      type: "text",
+      x: 200,
+      y: 200,
+      props: {
+        text: emoji,
+        fontSize: 48,
+        fontFamily: "Arial, sans-serif",
+        fontStyle: "normal",
+        textDecoration: "",
+        fill: "#000000",
+        align: "left",
+      },
+    };
+    addObject(emojiObj);
+    useUIStore.getState().setActiveTool("select");
+  };
   const { settings, isLoaded, loadSettings } = useSettingsStore();
 
   // Load settings on mount
@@ -62,8 +84,11 @@ function App() {
   useEffect(() => {
     const { setActiveTool } = useUIStore.getState();
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Don't intercept if typing in any text input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.target as HTMLElement)?.isContentEditable) return;
+      if (document.activeElement?.tagName === "TEXTAREA" || document.activeElement?.tagName === "INPUT") return;
 
       if (e.ctrlKey && e.key === "z") {
         e.preventDefault();
@@ -105,6 +130,12 @@ function App() {
 
       {isCaptureMode && <CaptureOverlay />}
       {showSettings && <SettingsPanel />}
+      {activeTool === "emoji" && (
+        <EmojiPicker
+          onSelect={handleEmojiSelect}
+          onClose={() => useUIStore.getState().setActiveTool("select")}
+        />
+      )}
     </div>
   );
 }

@@ -1,15 +1,49 @@
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 
+interface ExportRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 /**
  * Exports the Konva stage to a base64 PNG string.
- * If a stageRef is provided, renders the full annotated canvas.
- * Falls back to the raw capture base64 if no stage is available.
+ * Temporarily resets zoom to 1:1 so export matches the actual image dimensions.
  */
-export function getStageBase64(stageRef: React.RefObject<any> | null, fallbackBase64?: string): string | null {
+export function getStageBase64(
+  stageRef: any | null,
+  fallbackBase64?: string,
+  region?: ExportRegion
+): string | null {
+  if (stageRef?.current && region) {
+    const stage = stageRef.current;
+
+    // Save current scale and temporarily reset to 1:1
+    const prevScaleX = stage.scaleX();
+    const prevScaleY = stage.scaleY();
+    stage.scaleX(1);
+    stage.scaleY(1);
+    stage.batchDraw();
+
+    const dataUrl = stage.toDataURL({
+      x: region.x,
+      y: region.y,
+      width: region.width,
+      height: region.height,
+      pixelRatio: 1,
+    });
+
+    // Restore scale
+    stage.scaleX(prevScaleX);
+    stage.scaleY(prevScaleY);
+    stage.batchDraw();
+
+    return dataUrl.split(",")[1] || null;
+  }
   if (stageRef?.current) {
     const dataUrl = stageRef.current.toDataURL({ pixelRatio: 1 });
-    // dataUrl is "data:image/png;base64,..."
     return dataUrl.split(",")[1] || null;
   }
   return fallbackBase64 || null;
