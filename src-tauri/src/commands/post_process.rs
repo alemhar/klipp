@@ -45,19 +45,28 @@ pub async fn post_process_clicks(
         // Convert screen coordinates to video coordinates
         let vx = click.x - region_x;
         let vy = click.y - region_y;
-        // Draw a highlighted box around the click position
         let color = match click.button.as_str() {
-            "left" => "yellow@0.5",
-            "right" => "blue@0.5",
-            _ => "orange@0.5",
+            "left" => "yellow@0.6",
+            "right" => "blue@0.6",
+            _ => "orange@0.6",
         };
-        let size = 30;
-        let x = (vx - size / 2).max(0);
-        let y = (vy - size / 2).max(0);
+        let radius = 18;
 
+        // Use geq filter to draw a filled circle
+        // drawbox can't do circles, so we use multiple concentric drawbox calls
+        // to approximate a circle ring. Or better: use the ellipse-shaped drawtext.
+        // Most reliable: use the format filter with overlay of a generated circle.
+        // Simplest working approach: draw a ring using 4 thin drawbox calls forming a diamond,
+        // or use the libavfilter "drawtext" with a large bullet character.
+
+        // Using drawtext with Unicode bullet '●' (U+25CF) as a circle indicator
         filters.push(format!(
-            "drawbox=x={}:y={}:w={}:h={}:color={}:t=3:enable='between(t,{:.3},{:.3})'",
-            x, y, size, size, color, time_sec, end_time
+            "drawtext=text='●':fontsize=40:fontcolor={}:x={}:y={}:enable='between(t,{:.3},{:.3})'",
+            color,
+            vx - 12, // center the character
+            vy - 18,
+            time_sec,
+            end_time
         ));
     }
 
