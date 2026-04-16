@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { Square, RectangleHorizontal, MoveUpRight, Trash2 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useRecordingStore } from "../../stores/recordingStore";
+import { useGlobalShortcut } from "../../hooks/useGlobalShortcut";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -40,6 +41,15 @@ export function RecordingControls() {
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [isRecording, tick]);
+
+  // Global shortcuts for annotation tools (work even when other apps have focus)
+  const handleRectangle = useCallback(() => emit("overlay-set-tool", "rectangle"), []);
+  const handleArrow = useCallback(() => emit("overlay-set-tool", "arrow"), []);
+  const handleClear = useCallback(() => emit("overlay-clear"), []);
+
+  useGlobalShortcut("Ctrl+Shift+R", handleRectangle, isRecording);
+  useGlobalShortcut("Ctrl+Shift+A", handleArrow, isRecording);
+  useGlobalShortcut("Ctrl+Shift+Z", handleClear, isRecording);
 
   if (!isRecording) return null;
 
@@ -104,21 +114,21 @@ export function RecordingControls() {
       {/* Annotation tool buttons */}
       <button
         onClick={() => emit("overlay-set-tool", "rectangle")}
-        title="Rectangle (R)"
+        title="Rectangle (Ctrl+Shift+R)"
         style={toolBtnStyle}
       >
         <RectangleHorizontal size={14} />
       </button>
       <button
         onClick={() => emit("overlay-set-tool", "arrow")}
-        title="Arrow (A)"
+        title="Arrow (Ctrl+Shift+A)"
         style={toolBtnStyle}
       >
         <MoveUpRight size={14} />
       </button>
       <button
         onClick={() => emit("overlay-clear")}
-        title="Clear (Esc)"
+        title="Clear (Ctrl+Shift+Z)"
         style={toolBtnStyle}
       >
         <Trash2 size={14} />

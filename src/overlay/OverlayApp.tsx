@@ -112,23 +112,6 @@ export default function OverlayApp() {
     setDrawing(null);
   }, [drawing]);
 
-  // Keyboard shortcuts directly on the overlay
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setShapes([]);
-        setDrawing(null);
-        setActiveTool("none");
-      } else if (e.key.toLowerCase() === "r" && !e.ctrlKey && !e.altKey) {
-        setActiveTool((t) => (t === "rectangle" ? "none" : "rectangle"));
-      } else if (e.key.toLowerCase() === "a" && !e.ctrlKey && !e.altKey) {
-        setActiveTool((t) => (t === "arrow" ? "none" : "arrow"));
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   const allShapes = drawing ? [...shapes, drawing] : shapes;
 
   return (
