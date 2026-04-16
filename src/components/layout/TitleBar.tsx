@@ -1,9 +1,102 @@
-import { Camera, Settings, Moon, Sun } from "lucide-react";
+import {
+  Camera,
+  Settings,
+  Moon,
+  Sun,
+  Square,
+  Maximize,
+  Timer,
+  ChevronDown,
+  Video,
+} from "lucide-react";
+import { useState } from "react";
 import { useUIStore } from "../../stores/uiStore";
+import { useCaptureStore } from "../../stores/captureStore";
+import { useRecordingStore } from "../../stores/recordingStore";
 import { APP_NAME } from "../../lib/constants";
+import type { CaptureMode, DelayOption } from "../../types/capture";
+
+const CAPTURE_MODES: { mode: CaptureMode; label: string; icon: React.ReactNode }[] = [
+  { mode: "rectangular", label: "Rectangle", icon: <Square size={14} /> },
+  { mode: "fullscreen", label: "Fullscreen", icon: <Maximize size={14} /> },
+  { mode: "window", label: "Window", icon: <Square size={14} /> },
+];
+
+const DELAY_OPTIONS: { value: DelayOption; label: string }[] = [
+  { value: 0, label: "No delay" },
+  { value: 3, label: "3 seconds" },
+  { value: 5, label: "5 seconds" },
+  { value: 10, label: "10 seconds" },
+];
+
+function DropdownButton({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        title={label}
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          height: 28,
+          padding: "0 6px",
+          borderRadius: 6,
+          border: "none",
+          cursor: "pointer",
+          backgroundColor: "transparent",
+          color: "var(--text-primary)",
+          fontSize: 12,
+        }}
+      >
+        {icon}
+        <ChevronDown size={12} />
+      </button>
+      {open && (
+        <>
+          <div
+            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
+            onClick={() => setOpen(false)}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "100%",
+              left: 0,
+              marginTop: 4,
+              backgroundColor: "var(--bg-primary)",
+              border: "1px solid var(--border-color)",
+              borderRadius: 8,
+              padding: 4,
+              minWidth: 140,
+              zIndex: 100,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            }}
+            onClick={() => setOpen(false)}
+          >
+            {children}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function TitleBar() {
-  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } = useUIStore();
+  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } =
+    useUIStore();
+  const { mode, delay, setMode, setDelay } = useCaptureStore();
+  const { isRecording, setIsSelectingRegion, checkFfmpeg } = useRecordingStore();
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -15,6 +108,8 @@ export function TitleBar() {
   const handleNewCapture = () => {
     setIsCaptureMode(true);
   };
+
+  const currentModeInfo = CAPTURE_MODES.find((m) => m.mode === mode) || CAPTURE_MODES[0];
 
   return (
     <div
@@ -33,7 +128,72 @@ export function TitleBar() {
         <span style={{ fontSize: 13, fontWeight: 600 }}>{APP_NAME}</span>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      {/* Capture controls */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        {/* Capture mode selector */}
+        <DropdownButton label="Capture Mode" icon={currentModeInfo.icon}>
+          {CAPTURE_MODES.map((m) => (
+            <button
+              key={m.mode}
+              onClick={() => setMode(m.mode)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: mode === m.mode ? "var(--accent-color)" : "transparent",
+                color: mode === m.mode ? "#fff" : "var(--text-primary)",
+                fontSize: 12,
+                textAlign: "left",
+              }}
+            >
+              {m.icon}
+              {m.label}
+            </button>
+          ))}
+        </DropdownButton>
+
+        {/* Delay selector */}
+        <DropdownButton
+          label="Capture Delay"
+          icon={
+            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Timer size={14} />
+              {delay > 0 && (
+                <span style={{ fontSize: 10, fontWeight: 600 }}>{delay}s</span>
+              )}
+            </div>
+          }
+        >
+          {DELAY_OPTIONS.map((d) => (
+            <button
+              key={d.value}
+              onClick={() => setDelay(d.value)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                width: "100%",
+                padding: "6px 8px",
+                borderRadius: 4,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: delay === d.value ? "var(--accent-color)" : "transparent",
+                color: delay === d.value ? "#fff" : "var(--text-primary)",
+                fontSize: 12,
+                textAlign: "left",
+              }}
+            >
+              {d.label}
+            </button>
+          ))}
+        </DropdownButton>
+
+        {/* Capture button */}
         <button
           title="New Capture"
           onClick={handleNewCapture}
@@ -52,6 +212,40 @@ export function TitleBar() {
         >
           <Camera size={16} />
         </button>
+
+        {/* Record button */}
+        <button
+          title={isRecording ? "Recording..." : "Screen Record"}
+          onClick={async () => {
+            if (isRecording) return;
+            const hasFfmpeg = await checkFfmpeg();
+            if (!hasFfmpeg) {
+              alert(
+                "FFmpeg is required for screen recording.\n\nInstall it via:\n  winget install Gyan.FFmpeg\n\nThen restart SnippingZo."
+              );
+              return;
+            }
+            setIsSelectingRegion(true);
+          }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            border: "none",
+            cursor: isRecording ? "default" : "pointer",
+            backgroundColor: isRecording ? "rgba(255,59,48,0.15)" : "transparent",
+            color: isRecording ? "#FF3B30" : "var(--text-primary)",
+          }}
+        >
+          <Video size={16} />
+        </button>
+
+        <div style={{ width: 1, height: 20, backgroundColor: "var(--border-color)", margin: "0 2px" }} />
+
+        {/* Theme toggle */}
         <button
           title="Toggle Theme"
           onClick={toggleTheme}
@@ -70,6 +264,8 @@ export function TitleBar() {
         >
           {resolvedTheme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </button>
+
+        {/* Settings */}
         <button
           title="Settings"
           onClick={() => setShowSettings(true)}

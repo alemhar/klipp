@@ -31,7 +31,29 @@ export function CaptureOverlay() {
   });
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // On mount: hide main window, take fullscreen screenshot, then go fullscreen
+  const restoreMainWindow = async () => {
+    const mainWindow = getCurrentWindow();
+    await mainWindow.setFullscreen(false);
+    await mainWindow.setDecorations(true);
+    await mainWindow.setAlwaysOnTop(false);
+    await mainWindow.show();
+    await mainWindow.setFocus();
+  };
+
+  const finishCapture = useCallback(
+    async (result: CaptureResult) => {
+      await restoreMainWindow();
+      setIsCaptureMode(false);
+      useCanvasStore.getState().clearAll();
+      setCapturedImage(result);
+      if (settings.autoCopyToClipboard) {
+        await copyImageToClipboard(result.base64);
+      }
+    },
+    [setCapturedImage, setIsCaptureMode, settings.autoCopyToClipboard]
+  );
+
+  // On mount: hide main window, take fullscreen screenshot, then show overlay
   useEffect(() => {
     let cancelled = false;
 
@@ -39,19 +61,33 @@ export function CaptureOverlay() {
       try {
         const mainWindow = getCurrentWindow();
         await mainWindow.hide();
-
-        // Short delay to let the window fully hide
         await new Promise((r) => setTimeout(r, 50));
 
-        // Use fast BMP capture for the overlay preview (much faster than PNG)
         const result = await invoke<CaptureResult>("capture_fullscreen_fast");
         if (cancelled) return;
 
         setFullCapture(result);
+
+        // Fullscreen mode: immediately finish with the full capture (re-encode as PNG)
+        if (mode === "fullscreen") {
+          const pngResult = await invoke<CaptureResult>("capture_fullscreen");
+          if (cancelled) return;
+          // Restore and show result without overlay
+          await mainWindow.show();
+          await mainWindow.setFocus();
+          setIsCaptureMode(false);
+          useCanvasStore.getState().clearAll();
+          setCapturedImage(pngResult);
+          if (settings.autoCopyToClipboard) {
+            await copyImageToClipboard(pngResult.base64);
+          }
+          return;
+        }
+
+        // Rectangular/window mode: show overlay for selection
         const mime = result.format === "bmp" ? "image/bmp" : "image/png";
         setScreenshotBg(`data:${mime};base64,${result.base64}`);
 
-        // Show main window as fullscreen transparent overlay
         await mainWindow.setDecorations(false);
         await mainWindow.setAlwaysOnTop(true);
         await mainWindow.setFullscreen(true);
@@ -67,39 +103,36 @@ export function CaptureOverlay() {
     };
 
     setup();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Focus the overlay on mount for keyboard events
+  // Focus the overlay for keyboard events
   useEffect(() => {
     if (screenshotBg && overlayRef.current) {
       overlayRef.current.focus();
     }
   }, [screenshotBg]);
 
-  const restoreMainWindow = async () => {
-    const mainWindow = getCurrentWindow();
-    await mainWindow.setFullscreen(false);
-    await mainWindow.setDecorations(true);
-    await mainWindow.setAlwaysOnTop(false);
-    await mainWindow.show();
-    await mainWindow.setFocus();
-  };
-
   const handleCancel = useCallback(async () => {
     await restoreMainWindow();
     setIsCaptureMode(false);
   }, [setIsCaptureMode]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setRegion({
-      startX: e.clientX,
-      startY: e.clientY,
-      endX: e.clientX,
-      endY: e.clientY,
-      isDragging: true,
-    });
-  }, []);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (mode !== "rectangular") return;
+      setRegion({
+        startX: e.clientX,
+        startY: e.clientY,
+        endX: e.clientX,
+        endY: e.clientY,
+        isDragging: true,
+      });
+    },
+    [mode]
+  );
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -122,7 +155,6 @@ export function CaptureOverlay() {
     if (width < 5 || height < 5) return;
 
     try {
-      // Crop the region from the pre-captured fullscreen screenshot (no overlay in it)
       const result = await invoke<CaptureResult>("crop_image", {
         base64Data: fullCapture.base64,
         x: Math.round(x),
@@ -130,21 +162,13 @@ export function CaptureOverlay() {
         width: Math.round(width),
         height: Math.round(height),
       });
-
-      await restoreMainWindow();
-      setIsCaptureMode(false);
-      useCanvasStore.getState().clearAll();
-      setCapturedImage(result);
-
-      if (settings.autoCopyToClipboard) {
-        await copyImageToClipboard(result.base64);
-      }
+      await finishCapture(result);
     } catch (e) {
       console.error("Region capture failed:", e);
       await restoreMainWindow();
       setIsCaptureMode(false);
     }
-  }, [region, fullCapture, setCapturedImage, setIsCaptureMode, settings.autoCopyToClipboard]);
+  }, [region, fullCapture, finishCapture, setIsCaptureMode]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -160,19 +184,26 @@ export function CaptureOverlay() {
   const selectionW = Math.abs(region.endX - region.startX);
   const selectionH = Math.abs(region.endY - region.startY);
 
-  // Show nothing until screenshot is ready
-  if (!screenshotBg) {
+  // Loading state
+  if (!screenshotBg && mode !== "fullscreen") {
     return (
-      <div style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100vw",
-        height: "100vh",
-        zIndex: 9999,
-        backgroundColor: "#000",
-      }} />
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 9999,
+          backgroundColor: "#000",
+        }}
+      />
     );
+  }
+
+  // Fullscreen mode returns immediately, no overlay needed
+  if (mode === "fullscreen") {
+    return null;
   }
 
   return (
@@ -196,7 +227,7 @@ export function CaptureOverlay() {
         backgroundPosition: "0 0",
       }}
     >
-      {/* Dark overlay on unselected area */}
+      {/* Dark overlay */}
       <div
         style={{
           position: "absolute",
@@ -225,15 +256,12 @@ export function CaptureOverlay() {
           zIndex: 10,
         }}
       >
-        {mode === "rectangular"
-          ? "Drag to select region — Press ESC to cancel"
-          : "Click to capture — Press ESC to cancel"}
+        Drag to select region — Press ESC to cancel
       </div>
 
-      {/* Selection rectangle — shows the clear screenshot underneath */}
+      {/* Selection rectangle */}
       {region.isDragging && selectionW > 0 && selectionH > 0 && (
         <>
-          {/* Clear area (punched through the dark overlay) */}
           <div
             style={{
               position: "absolute",
@@ -249,7 +277,6 @@ export function CaptureOverlay() {
               zIndex: 5,
             }}
           />
-          {/* Dimension label */}
           <div
             style={{
               position: "absolute",

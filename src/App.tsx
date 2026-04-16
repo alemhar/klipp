@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { TitleBar } from "./components/layout/TitleBar";
 import { Toolbar } from "./components/layout/Toolbar";
@@ -6,19 +6,25 @@ import { StatusBar } from "./components/layout/StatusBar";
 import { ToolOptionsBar } from "./components/layout/ToolOptionsBar";
 import { AnnotationCanvas } from "./components/canvas/AnnotationCanvas";
 import { CaptureOverlay } from "./components/capture/CaptureOverlay";
+import { DelayTimer } from "./components/capture/DelayTimer";
 import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { EmojiPicker } from "./components/canvas/EmojiPicker";
+import { RecordingControls } from "./components/recording/RecordingControls";
+import { RecordingRegionSelector } from "./components/recording/RecordingRegionSelector";
 import { useUIStore } from "./stores/uiStore";
 import { useCaptureStore } from "./stores/captureStore";
 import { useCanvasStore } from "./stores/canvasStore";
 import type { TextObject } from "./types/canvas";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useRecordingStore } from "./stores/recordingStore";
 import { useGlobalShortcut } from "./hooks/useGlobalShortcut";
 
 function App() {
   const { isCaptureMode, setIsCaptureMode, showSettings, activeTool } = useUIStore();
-  const { setCapturedImage } = useCaptureStore();
+  const { setCapturedImage, delay } = useCaptureStore();
   const { undo, redo, addObject } = useCanvasStore();
+  const [isDelaying, setIsDelaying] = useState(false);
+  const { isRecording, isSelectingRegion } = useRecordingStore();
 
   const handleEmojiSelect = (emoji: string) => {
     const emojiObj: TextObject = {
@@ -52,10 +58,14 @@ function App() {
     useUIStore.getState().setResolvedTheme(theme);
   }, []);
 
-  // Handle capture shortcut — opens snipping overlay
+  // Handle capture shortcut — opens delay timer or snipping overlay
   const handleCaptureShortcut = useCallback(() => {
-    setIsCaptureMode(true);
-  }, [setIsCaptureMode]);
+    if (delay > 0) {
+      setIsDelaying(true);
+    } else {
+      setIsCaptureMode(true);
+    }
+  }, [setIsCaptureMode, delay]);
 
   // Register global shortcut (only after settings are loaded)
   useGlobalShortcut(
@@ -67,7 +77,7 @@ function App() {
   // Listen for tray events
   useEffect(() => {
     const unlisten = listen<string>("start-capture", () => {
-      setIsCaptureMode(true);
+      handleCaptureShortcut();
     });
 
     const unlistenSettings = listen("open-settings", () => {
@@ -128,8 +138,19 @@ function App() {
       <AnnotationCanvas />
       <StatusBar />
 
+      {isDelaying && (
+        <DelayTimer
+          seconds={delay}
+          onComplete={() => {
+            setIsDelaying(false);
+            setIsCaptureMode(true);
+          }}
+        />
+      )}
       {isCaptureMode && <CaptureOverlay />}
       {showSettings && <SettingsPanel />}
+      {isRecording && <RecordingControls />}
+      {isSelectingRegion && <RecordingRegionSelector />}
       {activeTool === "emoji" && (
         <EmojiPicker
           onSelect={handleEmojiSelect}

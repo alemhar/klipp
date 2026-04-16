@@ -12,6 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(commands::recording::RecordingState::new())
         .setup(|app| {
             tray::create_tray(app)?;
             Ok(())
@@ -25,6 +26,10 @@ pub fn run() {
             commands::file_io::save_image,
             commands::settings::get_settings,
             commands::settings::save_settings,
+            commands::recording::check_ffmpeg,
+            commands::recording::start_recording,
+            commands::recording::stop_recording,
+            commands::recording::is_recording,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
