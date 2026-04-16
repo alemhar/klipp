@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface RecordingConfig {
@@ -85,6 +86,8 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
       await invoke("start_recording", { config });
       // Show overlay and start mouse hook for click indicators
       await invoke("show_overlay").catch(console.error);
+      // Send recording region to overlay so webcam positions within captured area
+      await emit("overlay-region", { x: config.x, y: config.y, width: config.width, height: config.height }).catch(console.error);
       set({ isRecording: true, elapsedSeconds: 0, config });
     } catch (e) {
       console.error("Failed to start recording:", e);

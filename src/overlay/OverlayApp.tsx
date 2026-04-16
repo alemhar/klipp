@@ -25,16 +25,71 @@ export default function OverlayApp() {
   const [activeTool, setActiveTool] = useState<ToolType>("none");
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [drawing, setDrawing] = useState<Shape | null>(null);
+  const [webcamVisible, setWebcamVisible] = useState(false);
+  const [region, setRegion] = useState({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight });
+  const [webcamPos, setWebcamPos] = useState({ x: window.innerWidth - 200, y: window.innerHeight - 250 });
+  const [draggingWebcam, setDraggingWebcam] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const wasInteractive = useRef(false);
 
-  // Toggle overlay interactivity when tool changes
+  // Toggle overlay interactivity when tool changes or webcam is being dragged
   useEffect(() => {
-    const interactive = activeTool !== "none";
+    const interactive = activeTool !== "none" || draggingWebcam;
     if (interactive !== wasInteractive.current) {
       wasInteractive.current = interactive;
       invoke("set_overlay_interactive", { interactive }).catch(console.error);
     }
-  }, [activeTool]);
+  }, [activeTool, draggingWebcam]);
+
+  // Listen for recording region to position webcam within captured area
+  useEffect(() => {
+    const unlisten = listen<{ x: number; y: number; width: number; height: number }>(
+      "overlay-region",
+      (event) => {
+        const r = event.payload;
+        setRegion(r);
+        // Position webcam in bottom-right of the recording region
+        setWebcamPos({ x: r.x + r.width - 200, y: r.y + r.height - 200 });
+      }
+    );
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Listen for webcam toggle events
+  useEffect(() => {
+    const unlisten = listen("overlay-toggle-webcam", () => {
+      setWebcamVisible((prev) => !prev);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Start/stop webcam stream
+  useEffect(() => {
+    if (webcamVisible) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { width: 320, height: 320 } })
+        .then((stream) => {
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        })
+        .catch(console.error);
+    } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    }
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [webcamVisible]);
 
   // Listen for mouse-click events (ripples)
   useEffect(() => {
@@ -112,6 +167,33 @@ export default function OverlayApp() {
     setDrawing(null);
   }, [drawing]);
 
+  // Webcam drag handlers
+  const handleWebcamMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setDraggingWebcam(true);
+      dragOffset.current = { x: e.clientX - webcamPos.x, y: e.clientY - webcamPos.y };
+    },
+    [webcamPos]
+  );
+
+  const handleWebcamMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!draggingWebcam) return;
+      setWebcamPos({
+        x: e.clientX - dragOffset.current.x,
+        y: e.clientY - dragOffset.current.y,
+      });
+    },
+    [draggingWebcam]
+  );
+
+  const handleWebcamMouseUp = useCallback(() => {
+    if (draggingWebcam) {
+      setDraggingWebcam(false);
+    }
+  }, [draggingWebcam]);
+
   const allShapes = drawing ? [...shapes, drawing] : shapes;
 
   return (
@@ -124,12 +206,12 @@ export default function OverlayApp() {
         height: "100vh",
         background: "transparent",
         overflow: "hidden",
-        pointerEvents: activeTool !== "none" ? "auto" : "none",
-        cursor: activeTool !== "none" ? "crosshair" : "default",
+        pointerEvents: activeTool !== "none" || draggingWebcam ? "auto" : "none",
+        cursor: draggingWebcam ? "grabbing" : activeTool !== "none" ? "crosshair" : "default",
       }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
+      onMouseDown={(e) => { if (draggingWebcam) return; handleMouseDown(e); }}
+      onMouseMove={(e) => { handleWebcamMouseMove(e); handleMouseMove(e); }}
+      onMouseUp={() => { handleWebcamMouseUp(); handleMouseUp(); }}
     >
       {/* Tool indicator */}
       {activeTool !== "none" && (
@@ -234,6 +316,41 @@ export default function OverlayApp() {
           return null;
         })}
       </svg>
+
+      {/* Webcam bubble */}
+      {webcamVisible && (
+        <div
+          onMouseDown={handleWebcamMouseDown}
+          style={{
+            position: "absolute",
+            left: webcamPos.x,
+            top: webcamPos.y,
+            width: 150,
+            height: 150,
+            borderRadius: "50%",
+            overflow: "hidden",
+            border: "3px solid rgba(255,255,255,0.8)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
+            cursor: draggingWebcam ? "grabbing" : "grab",
+            pointerEvents: "auto",
+            zIndex: 500,
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: "scaleX(-1)",
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+      )}
 
       <style>{`
         @keyframes ripple-expand {

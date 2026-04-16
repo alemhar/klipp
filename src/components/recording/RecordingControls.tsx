@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from "react";
-import { Square, RectangleHorizontal, MoveUpRight, Trash2 } from "lucide-react";
+import { Square, RectangleHorizontal, MoveUpRight, Trash2, Camera } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useRecordingStore } from "../../stores/recordingStore";
@@ -23,10 +23,10 @@ export function RecordingControls() {
     const setup = async () => {
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(true);
-      await mainWindow.setSize({ type: "Logical", width: 320, height: 50 });
+      await mainWindow.setSize({ type: "Logical", width: 360, height: 50 });
       await mainWindow.setPosition({
         type: "Logical",
-        x: Math.round(screen.width / 2 - 160),
+        x: Math.round(screen.width / 2 - 180),
         y: 10,
       });
       await mainWindow.setFocus();
@@ -46,10 +46,12 @@ export function RecordingControls() {
   const handleRectangle = useCallback(() => emit("overlay-set-tool", "rectangle"), []);
   const handleArrow = useCallback(() => emit("overlay-set-tool", "arrow"), []);
   const handleClear = useCallback(() => emit("overlay-clear"), []);
+  const handleWebcam = useCallback(() => emit("overlay-toggle-webcam"), []);
 
   useGlobalShortcut("Ctrl+Shift+R", handleRectangle, isRecording);
   useGlobalShortcut("Ctrl+Shift+A", handleArrow, isRecording);
   useGlobalShortcut("Ctrl+Shift+Z", handleClear, isRecording);
+  useGlobalShortcut("Ctrl+Shift+W", handleWebcam, isRecording);
 
   if (!isRecording) return null;
 
@@ -132,6 +134,14 @@ export function RecordingControls() {
         style={toolBtnStyle}
       >
         <Trash2 size={14} />
+      </button>
+
+      <button
+        onClick={() => emit("overlay-toggle-webcam")}
+        title="Webcam (Ctrl+Shift+W)"
+        style={toolBtnStyle}
+      >
+        <Camera size={14} />
       </button>
 
       {/* Stop button */}
