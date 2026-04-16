@@ -18,6 +18,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::capture::capture_fullscreen,
+            commands::capture::capture_fullscreen_fast,
             commands::capture::capture_region,
             commands::capture::crop_image,
             commands::clipboard::copy_image_to_clipboard,

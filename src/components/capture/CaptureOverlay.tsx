@@ -40,14 +40,16 @@ export function CaptureOverlay() {
         const mainWindow = getCurrentWindow();
         await mainWindow.hide();
 
-        // Small delay to let the window fully hide
-        await new Promise((r) => setTimeout(r, 150));
+        // Short delay to let the window fully hide
+        await new Promise((r) => setTimeout(r, 50));
 
-        const result = await invoke<CaptureResult>("capture_fullscreen");
+        // Use fast BMP capture for the overlay preview (much faster than PNG)
+        const result = await invoke<CaptureResult>("capture_fullscreen_fast");
         if (cancelled) return;
 
         setFullCapture(result);
-        setScreenshotBg(`data:image/png;base64,${result.base64}`);
+        const mime = result.format === "bmp" ? "image/bmp" : "image/png";
+        setScreenshotBg(`data:${mime};base64,${result.base64}`);
 
         // Show main window as fullscreen transparent overlay
         await mainWindow.setDecorations(false);

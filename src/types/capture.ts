@@ -6,6 +6,7 @@ export interface CaptureResult {
   base64: string;
   width: number;
   height: number;
+  format: string;
 }
 
 export interface CaptureRegion {
