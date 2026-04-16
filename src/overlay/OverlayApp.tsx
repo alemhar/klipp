@@ -128,7 +128,10 @@ export default function OverlayApp() {
               document.removeEventListener("mouseup", handleUp);
             };
             document.addEventListener("mousemove", handleMove);
-            document.addEventListener("mouseup", handleUp);
+            // Delay attaching mouseup so it doesn't fire from the initial click release
+            setTimeout(() => {
+              document.addEventListener("mouseup", handleUp);
+            }, 100);
             return; // Don't show ripple for webcam clicks
           }
         }
@@ -361,6 +364,8 @@ export default function OverlayApp() {
               transform: "scaleX(-1)",
               display: "block",
               pointerEvents: "none",
+              borderRadius: "50%",
+              clipPath: "circle(50% at 50% 50%)",
             }}
           />
         </div>
