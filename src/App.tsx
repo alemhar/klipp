@@ -11,9 +11,6 @@ import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { EmojiPicker } from "./components/canvas/EmojiPicker";
 import { RecordingControls } from "./components/recording/RecordingControls";
 import { RecordingRegionSelector } from "./components/recording/RecordingRegionSelector";
-import { ClickIndicator } from "./components/recording/ClickIndicator";
-import { LiveAnnotationOverlay } from "./components/recording/LiveAnnotationOverlay";
-import { WebcamBubble } from "./components/recording/WebcamBubble";
 import { useUIStore } from "./stores/uiStore";
 import { useCaptureStore } from "./stores/captureStore";
 import { useCanvasStore } from "./stores/canvasStore";
@@ -153,9 +150,6 @@ function App() {
       {isCaptureMode && <CaptureOverlay />}
       {showSettings && <SettingsPanel />}
       {isRecording && <RecordingControls />}
-      {isRecording && <ClickIndicator />}
-      {isRecording && <LiveAnnotationOverlay />}
-      {isRecording && <WebcamBubble />}
       {isSelectingRegion && <RecordingRegionSelector />}
       {activeTool === "emoji" && (
         <EmojiPicker

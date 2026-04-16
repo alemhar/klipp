@@ -120,6 +120,9 @@ export function RecordingRegionSelector() {
     const evenW = Math.floor(width / 2) * 2;
     const evenH = Math.floor(height / 2) * 2;
 
+    // Ask user if they want webcam
+    const enableWebcam = confirm("Enable webcam overlay in recording?");
+
     try {
       await startRecording({
         x: Math.round(x),
@@ -129,6 +132,9 @@ export function RecordingRegionSelector() {
         fps: 30,
         outputPath,
         captureAudio: false,
+        webcamEnabled: enableWebcam,
+        webcamSize: 150,
+        webcamPosition: "bottom-right",
       });
     } catch (e) {
       alert(`Failed to start recording: ${e}`);

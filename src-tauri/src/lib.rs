@@ -29,12 +29,10 @@ pub fn run() {
             commands::ffmpeg::check_ffmpeg,
             commands::ffmpeg::get_ffmpeg_path,
             commands::ffmpeg::download_ffmpeg,
+            commands::recording::list_webcams,
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::is_recording,
-            commands::mouse_hook::start_mouse_hook,
-            commands::mouse_hook::stop_mouse_hook,
-            commands::post_process::post_process_clicks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 use super::ffmpeg;
 
@@ -15,6 +15,9 @@ pub struct RecordingConfig {
     pub fps: u32,
     pub output_path: String,
     pub capture_audio: bool,
+    pub webcam_enabled: bool,
+    pub webcam_size: i32,
+    pub webcam_position: String, // "bottom-right", "bottom-left", "top-right", "top-left"
 }
 
 pub struct RecordingState {
@@ -31,6 +34,35 @@ impl RecordingState {
     }
 }
 
+/// List available webcam devices
+#[tauri::command]
+pub fn list_webcams(app: AppHandle) -> Result<Vec<String>, String> {
+    let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
+    let output = Command::new(&ffmpeg_path)
+        .args(["-list_devices", "true", "-f", "dshow", "-i", "dummy"])
+        .output()
+        .map_err(|e| format!("Failed to list devices: {}", e))?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut devices = Vec::new();
+
+    for line in stderr.lines() {
+        // Look for video devices: lines containing "(video)" or "(none)" that aren't "Alternative name"
+        if (line.contains("(video)") || line.contains("(none)"))
+            && !line.contains("Alternative name")
+        {
+            // Extract device name between quotes
+            if let Some(start) = line.find('"') {
+                if let Some(end) = line[start + 1..].find('"') {
+                    devices.push(line[start + 1..start + 1 + end].to_string());
+                }
+            }
+        }
+    }
+
+    Ok(devices)
+}
+
 /// Start screen recording using FFmpeg with GDI grab (Windows)
 #[tauri::command]
 pub fn start_recording(
@@ -43,49 +75,90 @@ pub fn start_recording(
         return Err("Already recording".into());
     }
 
-    // Build FFmpeg command for Windows GDI screen capture
-    let mut args = vec![
-        "-y".to_string(),
-        "-f".to_string(),
-        "gdigrab".to_string(),
-        "-framerate".to_string(),
-        config.fps.to_string(),
-        "-offset_x".to_string(),
-        config.x.to_string(),
-        "-offset_y".to_string(),
-        config.y.to_string(),
-        "-video_size".to_string(),
-        format!("{}x{}", config.width, config.height),
-        "-i".to_string(),
-        "desktop".to_string(),
-    ];
+    let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
+    let mut args: Vec<String> = Vec::new();
 
-    // Add audio capture if requested
+    // Input 0: Screen capture via GDI
+    args.extend_from_slice(&[
+        "-y".into(),
+        "-f".into(),
+        "gdigrab".into(),
+        "-framerate".into(),
+        config.fps.to_string(),
+        "-offset_x".into(),
+        config.x.to_string(),
+        "-offset_y".into(),
+        config.y.to_string(),
+        "-video_size".into(),
+        format!("{}x{}", config.width, config.height),
+        "-i".into(),
+        "desktop".into(),
+    ]);
+
+    // Input 1: Webcam (if enabled)
+    if config.webcam_enabled {
+        // Find first available webcam
+        let webcams = list_webcams(app.clone()).unwrap_or_default();
+        if let Some(cam_name) = webcams.first() {
+            args.extend_from_slice(&[
+                "-f".into(),
+                "dshow".into(),
+                "-video_size".into(),
+                format!("{}x{}", config.webcam_size, config.webcam_size),
+                "-i".into(),
+                format!("video={}", cam_name),
+            ]);
+        }
+    }
+
+    // Audio capture if requested
     if config.capture_audio {
-        // Capture system audio via DirectShow (requires virtual audio cable or similar)
         args.extend_from_slice(&[
-            "-f".to_string(),
-            "dshow".to_string(),
-            "-i".to_string(),
-            "audio=virtual-audio-capturer".to_string(),
+            "-f".into(),
+            "dshow".into(),
+            "-i".into(),
+            "audio=virtual-audio-capturer".into(),
         ]);
     }
 
-    // Output encoding settings
+    // Filter: overlay webcam as circle if enabled
+    if config.webcam_enabled {
+        let margin = 20;
+        let cam_s = config.webcam_size;
+
+        // Calculate overlay position
+        let (ox, oy) = match config.webcam_position.as_str() {
+            "bottom-left" => (margin, config.height - cam_s - margin),
+            "top-right" => (config.width - cam_s - margin, margin),
+            "top-left" => (margin, margin),
+            _ => (config.width - cam_s - margin, config.height - cam_s - margin), // bottom-right default
+        };
+
+        // Create circular mask using geq filter and overlay
+        // Scale webcam, make it circular, overlay on screen capture
+        let filter = format!(
+            "[1:v]scale={s}:{s},format=yuva420p,geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(lte(pow(X-{r},2)+pow(Y-{r},2),pow({r},2)),255,0)'[cam];[0:v][cam]overlay={ox}:{oy}",
+            s = cam_s,
+            r = cam_s / 2,
+            ox = ox,
+            oy = oy
+        );
+
+        args.extend_from_slice(&["-filter_complex".into(), filter, "-map".into(), "0:a?".into()]);
+    }
+
+    // Output encoding
     args.extend_from_slice(&[
-        "-c:v".to_string(),
-        "libx264".to_string(),
-        "-preset".to_string(),
-        "ultrafast".to_string(),
-        "-pix_fmt".to_string(),
-        "yuv420p".to_string(),
-        "-crf".to_string(),
-        "23".to_string(),
+        "-c:v".into(),
+        "libx264".into(),
+        "-preset".into(),
+        "ultrafast".into(),
+        "-pix_fmt".into(),
+        "yuv420p".into(),
+        "-crf".into(),
+        "23".into(),
         config.output_path.clone(),
     ]);
-
-    // Resolve FFmpeg path (bundled or system)
-    let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
 
     let child = Command::new(&ffmpeg_path)
         .args(&args)
@@ -113,24 +186,17 @@ pub fn stop_recording(state: State<'_, RecordingState>) -> Result<String, String
     }
 
     if let Some(ref mut child) = *process {
-        // Send 'q' to FFmpeg's stdin to gracefully stop
         if let Some(ref mut stdin) = child.stdin {
             use std::io::Write;
             let _ = stdin.write_all(b"q");
         }
-        // Wait for process to finish
         let _ = child.wait();
     }
-
-    let output_path = process
-        .as_ref()
-        .map(|_| "Recording saved".to_string())
-        .unwrap_or_default();
 
     *process = None;
     *is_recording = false;
 
-    Ok(output_path)
+    Ok("Recording saved".into())
 }
 
 /// Check if currently recording
