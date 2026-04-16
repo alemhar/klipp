@@ -52,12 +52,27 @@ unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: LPAR
 // ─── Overlay window commands ───
 
 #[tauri::command]
-pub async fn show_overlay(app: AppHandle) -> Result<(), String> {
+pub async fn show_overlay(
+    app: AppHandle,
+    x: Option<i32>,
+    y: Option<i32>,
+    width: Option<i32>,
+    height: Option<i32>,
+) -> Result<(), String> {
     // If overlay already exists, just show it
     if let Some(overlay) = app.get_webview_window("overlay") {
         overlay.show().map_err(|e: tauri::Error| e.to_string())?;
         return Ok(());
     }
+
+    // Build overlay URL with region query params so the React app knows the recording area
+    let url = format!(
+        "overlay.html?x={}&y={}&w={}&h={}",
+        x.unwrap_or(0),
+        y.unwrap_or(0),
+        width.unwrap_or(1920),
+        height.unwrap_or(1080),
+    );
 
     // Create the overlay window on the main thread via channel to avoid deadlocks.
     let (tx, rx) = mpsc::channel();
@@ -67,7 +82,7 @@ pub async fn show_overlay(app: AppHandle) -> Result<(), String> {
         let result = WebviewWindowBuilder::new(
             &app_clone,
             "overlay",
-            WebviewUrl::App("overlay.html".into()),
+            WebviewUrl::App(url.into()),
         )
         .title("")
         .decorations(false)

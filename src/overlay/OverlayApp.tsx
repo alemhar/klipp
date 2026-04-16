@@ -26,8 +26,20 @@ export default function OverlayApp() {
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [drawing, setDrawing] = useState<Shape | null>(null);
   const [webcamVisible, setWebcamVisible] = useState(false);
-  const [region, setRegion] = useState({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight });
-  const [webcamPos, setWebcamPos] = useState({ x: window.innerWidth - 200, y: window.innerHeight - 250 });
+
+  // Read recording region from URL query params (set by show_overlay command)
+  const params = new URLSearchParams(window.location.search);
+  const region = {
+    x: parseInt(params.get("x") || "0"),
+    y: parseInt(params.get("y") || "0"),
+    width: parseInt(params.get("w") || String(window.innerWidth)),
+    height: parseInt(params.get("h") || String(window.innerHeight)),
+  };
+
+  const [webcamPos, setWebcamPos] = useState({
+    x: region.x + region.width - 200,
+    y: region.y + region.height - 200,
+  });
   const [draggingWebcam, setDraggingWebcam] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -42,20 +54,6 @@ export default function OverlayApp() {
       invoke("set_overlay_interactive", { interactive }).catch(console.error);
     }
   }, [activeTool, draggingWebcam]);
-
-  // Listen for recording region to position webcam within captured area
-  useEffect(() => {
-    const unlisten = listen<{ x: number; y: number; width: number; height: number }>(
-      "overlay-region",
-      (event) => {
-        const r = event.payload;
-        setRegion(r);
-        // Position webcam in bottom-right of the recording region
-        setWebcamPos({ x: r.x + r.width - 200, y: r.y + r.height - 200 });
-      }
-    );
-    return () => { unlisten.then((fn) => fn()); };
-  }, []);
 
   // Listen for webcam toggle events
   useEffect(() => {
