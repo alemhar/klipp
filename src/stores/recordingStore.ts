@@ -12,6 +12,13 @@ interface RecordingConfig {
   captureAudio: boolean;
 }
 
+export interface ClickEvent {
+  x: number;
+  y: number;
+  button: string;
+  timeMs: number; // milliseconds since recording started
+}
+
 interface SavedWindowState {
   width: number;
   height: number;
@@ -26,10 +33,13 @@ interface RecordingState {
   elapsedSeconds: number;
   config: RecordingConfig | null;
   savedWindowState: SavedWindowState | null;
+  clickEvents: ClickEvent[];
+  recordingStartTime: number | null;
 
   checkFfmpeg: () => Promise<boolean>;
   setIsSelectingRegion: (v: boolean) => void;
   saveWindowState: () => Promise<void>;
+  addClickEvent: (event: ClickEvent) => void;
   startRecording: (config: RecordingConfig) => Promise<void>;
   stopRecording: () => Promise<void>;
   tick: () => void;
@@ -42,6 +52,8 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   elapsedSeconds: 0,
   config: null,
   savedWindowState: null,
+  clickEvents: [],
+  recordingStartTime: null,
 
   checkFfmpeg: async () => {
     try {
@@ -55,6 +67,9 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   },
 
   setIsSelectingRegion: (v) => set({ isSelectingRegion: v }),
+
+  addClickEvent: (event) =>
+    set((s) => ({ clickEvents: [...s.clickEvents, event] })),
 
   // Save the current window size/position BEFORE any recording flow starts
   // Only save if we don't already have a saved state (prevent overwriting)
@@ -77,7 +92,7 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   startRecording: async (config) => {
     try {
       await invoke("start_recording", { config });
-      set({ isRecording: true, elapsedSeconds: 0, config });
+      set({ isRecording: true, elapsedSeconds: 0, config, clickEvents: [], recordingStartTime: Date.now() });
     } catch (e) {
       console.error("Failed to start recording:", e);
       throw e;
@@ -86,9 +101,24 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
 
   stopRecording: async () => {
     try {
+      const { config, clickEvents } = get();
       await invoke("stop_recording");
 
-      // Restore window before clearing state
+      // Post-process: add click indicators to the video
+      if (config && clickEvents.length > 0) {
+        try {
+          await invoke("post_process_clicks", {
+            videoPath: config.outputPath,
+            clicks: clickEvents,
+            regionX: config.x,
+            regionY: config.y,
+          });
+        } catch (e) {
+          console.error("Click indicator post-processing failed:", e);
+        }
+      }
+
+      // Restore window
       const saved = get().savedWindowState;
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(false);
@@ -97,7 +127,7 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
         await mainWindow.setPosition({ type: "Logical", x: saved.x, y: saved.y });
       }
 
-      set({ isRecording: false, config: null, savedWindowState: null });
+      set({ isRecording: false, config: null, savedWindowState: null, clickEvents: [], recordingStartTime: null });
     } catch (e) {
       console.error("Failed to stop recording:", e);
     }
