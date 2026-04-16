@@ -47,8 +47,9 @@ pub fn list_webcams(app: AppHandle) -> Result<Vec<String>, String> {
     let mut devices = Vec::new();
 
     for line in stderr.lines() {
-        // Look for video devices: lines containing "(video)" or "(none)" that aren't "Alternative name"
+        // Look for video devices — they show as "(video)" or "(none)" but NOT "(audio)"
         if (line.contains("(video)") || line.contains("(none)"))
+            && !line.contains("(audio)")
             && !line.contains("Alternative name")
         {
             // Extract device name between quotes
@@ -96,18 +97,18 @@ pub fn start_recording(
     ]);
 
     // Input 1: Webcam (if enabled)
+    // Track whether we actually added a webcam input
+    let mut webcam_added = false;
     if config.webcam_enabled {
-        // Find first available webcam
         let webcams = list_webcams(app.clone()).unwrap_or_default();
         if let Some(cam_name) = webcams.first() {
             args.extend_from_slice(&[
                 "-f".into(),
                 "dshow".into(),
-                "-video_size".into(),
-                format!("{}x{}", config.webcam_size, config.webcam_size),
                 "-i".into(),
                 format!("video={}", cam_name),
             ]);
+            webcam_added = true;
         }
     }
 
@@ -121,8 +122,8 @@ pub fn start_recording(
         ]);
     }
 
-    // Filter: overlay webcam as circle if enabled
-    if config.webcam_enabled {
+    // Filter: overlay webcam as circle if we successfully added a webcam input
+    if webcam_added {
         let margin = 20;
         let cam_s = config.webcam_size;
 
@@ -164,7 +165,7 @@ pub fn start_recording(
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start FFmpeg: {}. Is FFmpeg installed?", e))?;
 

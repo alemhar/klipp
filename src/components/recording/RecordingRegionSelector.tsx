@@ -14,7 +14,7 @@ interface RegionState {
 }
 
 export function RecordingRegionSelector() {
-  const { setIsSelectingRegion, startRecording } = useRecordingStore();
+  const { setIsSelectingRegion, startRecording, webcamEnabled } = useRecordingStore();
   const [screenshotBg, setScreenshotBg] = useState<string | null>(null);
   const [region, setRegion] = useState<RegionState>({
     startX: 0,
@@ -120,9 +120,6 @@ export function RecordingRegionSelector() {
     const evenW = Math.floor(width / 2) * 2;
     const evenH = Math.floor(height / 2) * 2;
 
-    // Ask user if they want webcam
-    const enableWebcam = confirm("Enable webcam overlay in recording?");
-
     try {
       await startRecording({
         x: Math.round(x),
@@ -130,9 +127,9 @@ export function RecordingRegionSelector() {
         width: evenW,
         height: evenH,
         fps: 30,
-        outputPath,
+        outputPath: outputPath,
         captureAudio: false,
-        webcamEnabled: enableWebcam,
+        webcamEnabled: webcamEnabled,
         webcamSize: 150,
         webcamPosition: "bottom-right",
       });

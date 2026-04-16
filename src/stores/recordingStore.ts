@@ -10,6 +10,9 @@ interface RecordingConfig {
   fps: number;
   outputPath: string;
   captureAudio: boolean;
+  webcamEnabled: boolean;
+  webcamSize: number;
+  webcamPosition: string;
 }
 
 interface SavedWindowState {
@@ -26,8 +29,10 @@ interface RecordingState {
   elapsedSeconds: number;
   config: RecordingConfig | null;
   savedWindowState: SavedWindowState | null;
+  webcamEnabled: boolean;
   checkFfmpeg: () => Promise<boolean>;
   setIsSelectingRegion: (v: boolean) => void;
+  setWebcamEnabled: (v: boolean) => void;
   saveWindowState: () => Promise<void>;
   startRecording: (config: RecordingConfig) => Promise<void>;
   stopRecording: () => Promise<void>;
@@ -39,6 +44,7 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   isSelectingRegion: false,
   hasFfmpeg: null,
   elapsedSeconds: 0,
+  webcamEnabled: false,
   config: null,
   savedWindowState: null,
 
@@ -54,6 +60,7 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   },
 
   setIsSelectingRegion: (v) => set({ isSelectingRegion: v }),
+  setWebcamEnabled: (v) => set({ webcamEnabled: v }),
 
   // Save the current window size/position BEFORE any recording flow starts
   // Only save if we don't already have a saved state (prevent overwriting)

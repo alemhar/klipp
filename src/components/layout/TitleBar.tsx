@@ -96,7 +96,7 @@ export function TitleBar() {
   const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } =
     useUIStore();
   const { mode, delay, setMode, setDelay } = useCaptureStore();
-  const { isRecording, setIsSelectingRegion, checkFfmpeg, saveWindowState } = useRecordingStore();
+  const { isRecording, setIsSelectingRegion, checkFfmpeg, saveWindowState, webcamEnabled, setWebcamEnabled } = useRecordingStore();
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -211,6 +211,28 @@ export function TitleBar() {
           }}
         >
           <Camera size={16} />
+        </button>
+
+        {/* Webcam toggle */}
+        <button
+          title={webcamEnabled ? "Webcam: ON" : "Webcam: OFF"}
+          onClick={() => setWebcamEnabled(!webcamEnabled)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            backgroundColor: webcamEnabled ? "rgba(0,120,212,0.15)" : "transparent",
+            color: webcamEnabled ? "var(--accent-color)" : "var(--text-secondary)",
+            fontSize: 11,
+            fontWeight: 600,
+          }}
+        >
+          CAM
         </button>
 
         {/* Record button */}
