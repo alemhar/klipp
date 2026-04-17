@@ -11,6 +11,24 @@ interface ClickRipple {
 
 type ToolType = "none" | "rectangle" | "arrow";
 
+type WebcamCorner = "br" | "bl" | "tl" | "tr";
+
+const WEBCAM_MARGIN = 25;
+const WEBCAM_SIZE = 150;
+
+function cornerToPos(
+  corner: WebcamCorner,
+  region: { x: number; y: number; width: number; height: number }
+) {
+  const offset = WEBCAM_SIZE + WEBCAM_MARGIN;
+  switch (corner) {
+    case "br": return { x: region.x + region.width - offset, y: region.y + region.height - offset };
+    case "bl": return { x: region.x + WEBCAM_MARGIN, y: region.y + region.height - offset };
+    case "tl": return { x: region.x + WEBCAM_MARGIN, y: region.y + WEBCAM_MARGIN };
+    case "tr": return { x: region.x + region.width - offset, y: region.y + WEBCAM_MARGIN };
+  }
+}
+
 interface Shape {
   id: number;
   type: "rectangle" | "arrow";
@@ -36,10 +54,8 @@ export default function OverlayApp() {
     height: parseInt(params.get("h") || String(window.innerHeight)),
   };
 
-  const [webcamPos, setWebcamPos] = useState({
-    x: region.x + region.width - 200,
-    y: region.y + region.height - 200,
-  });
+  const [webcamCorner, setWebcamCorner] = useState<WebcamCorner | null>("br");
+  const [webcamPos, setWebcamPos] = useState(() => cornerToPos("br", region));
   const [draggingWebcam, setDraggingWebcam] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -59,6 +75,26 @@ export default function OverlayApp() {
   useEffect(() => {
     const unlisten = listen("overlay-toggle-webcam", () => {
       setWebcamVisible((prev) => !prev);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  // Sync webcamPos when corner is set via hotkey
+  useEffect(() => {
+    if (webcamCorner) {
+      setWebcamPos(cornerToPos(webcamCorner, region));
+    }
+  }, [webcamCorner, region.x, region.y, region.width, region.height]);
+
+  // Listen for cycle webcam position events (Ctrl+Shift+E)
+  useEffect(() => {
+    const order: WebcamCorner[] = ["br", "bl", "tl", "tr"];
+    const unlisten = listen("overlay-cycle-webcam-position", () => {
+      setWebcamCorner((prev) => {
+        if (prev === null) return "br"; // freeform -> reset to bottom-right
+        const idx = order.indexOf(prev);
+        return order[(idx + 1) % order.length];
+      });
     });
     return () => { unlisten.then((fn) => fn()); };
   }, []);
@@ -114,6 +150,7 @@ export default function OverlayApp() {
             dragOffset.current = { x: x - wp.x, y: y - wp.y };
             invoke("set_overlay_interactive", { interactive: true }).catch(console.error);
             setDraggingWebcam(true);
+            setWebcamCorner(null); // freeform — next Ctrl+Shift+E resets to br
 
             const handleMove = (ev: MouseEvent) => {
               setWebcamPos({
@@ -248,6 +285,32 @@ export default function OverlayApp() {
             {activeTool === "rectangle" ? "Rectangle" : "Arrow"} — Ctrl+Shift+Z to clear
           </div>
         )}
+
+        {/* Recording region outline — sits just outside the region so the border
+            isn't captured by FFmpeg. Falls back to on-the-edge if the region
+            touches the screen boundary. */}
+        {(() => {
+          const canExpandLeft = region.x >= 2;
+          const canExpandTop = region.y >= 2;
+          const canExpandRight = region.x + region.width + 2 <= window.innerWidth;
+          const canExpandBottom = region.y + region.height + 2 <= window.innerHeight;
+          return (
+            <div
+              style={{
+                position: "absolute",
+                left: canExpandLeft ? region.x - 2 : region.x,
+                top: canExpandTop ? region.y - 2 : region.y,
+                width: region.width + (canExpandLeft ? 2 : 0) + (canExpandRight ? 2 : 0),
+                height: region.height + (canExpandTop ? 2 : 0) + (canExpandBottom ? 2 : 0),
+                border: "2px dashed #d1d5db",
+                boxSizing: "border-box",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+          );
+        })()}
+
 
         {/* Click ripples */}
         {ripples.map((ripple) => (

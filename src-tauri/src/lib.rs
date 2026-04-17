@@ -43,6 +43,7 @@ pub fn run() {
             commands::ffmpeg::get_ffmpeg_path,
             commands::ffmpeg::download_ffmpeg,
             commands::recording::list_webcams,
+            commands::recording::list_audio_inputs,
             commands::recording::start_recording,
             commands::recording::stop_recording,
             commands::recording::is_recording,

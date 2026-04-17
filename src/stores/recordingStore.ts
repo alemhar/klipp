@@ -9,7 +9,9 @@ interface RecordingConfig {
   height: number;
   fps: number;
   outputPath: string;
-  captureAudio: boolean;
+  systemAudio: boolean;
+  micAudio: boolean;
+  micDevice: string | null; // null = use first available audio input
   webcamEnabled: boolean;
   webcamSize: number;
   webcamPosition: string;
@@ -22,6 +24,8 @@ interface SavedWindowState {
   y: number;
 }
 
+const SYSTEM_AUDIO_DEVICE = "virtual-audio-capturer";
+
 interface RecordingState {
   isRecording: boolean;
   isSelectingRegion: boolean;
@@ -30,9 +34,19 @@ interface RecordingState {
   config: RecordingConfig | null;
   savedWindowState: SavedWindowState | null;
   webcamEnabled: boolean;
+  systemAudioEnabled: boolean;
+  micAudioEnabled: boolean;
+  micDevice: string | null;
+  audioInputs: string[];              // populated via loadAudioInputs()
+  hasSystemAudioCapture: boolean;     // true iff virtual-audio-capturer is available
+  hasMicrophone: boolean;             // true iff at least one mic input exists
   checkFfmpeg: () => Promise<boolean>;
+  loadAudioInputs: () => Promise<void>;
   setIsSelectingRegion: (v: boolean) => void;
   setWebcamEnabled: (v: boolean) => void;
+  setSystemAudioEnabled: (v: boolean) => void;
+  setMicAudioEnabled: (v: boolean) => void;
+  setMicDevice: (d: string | null) => void;
   saveWindowState: () => Promise<void>;
   startRecording: (config: RecordingConfig) => Promise<void>;
   stopRecording: () => Promise<void>;
@@ -45,6 +59,12 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
   hasFfmpeg: null,
   elapsedSeconds: 0,
   webcamEnabled: false,
+  systemAudioEnabled: false,
+  micAudioEnabled: false,
+  micDevice: null,
+  audioInputs: [],
+  hasSystemAudioCapture: false,
+  hasMicrophone: false,
   config: null,
   savedWindowState: null,
 
@@ -59,8 +79,28 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
     }
   },
 
+  loadAudioInputs: async () => {
+    try {
+      const devices = await invoke<string[]>("list_audio_inputs");
+      const hasSystemAudioCapture = devices.includes(SYSTEM_AUDIO_DEVICE);
+      // Mic inputs = anything except the system-audio virtual device
+      const mics = devices.filter((d) => d !== SYSTEM_AUDIO_DEVICE);
+      set({
+        audioInputs: devices,
+        hasSystemAudioCapture,
+        hasMicrophone: mics.length > 0,
+      });
+    } catch (e) {
+      console.error("Failed to list audio inputs:", e);
+      set({ audioInputs: [], hasSystemAudioCapture: false, hasMicrophone: false });
+    }
+  },
+
   setIsSelectingRegion: (v) => set({ isSelectingRegion: v }),
   setWebcamEnabled: (v) => set({ webcamEnabled: v }),
+  setSystemAudioEnabled: (v) => set({ systemAudioEnabled: v }),
+  setMicAudioEnabled: (v) => set({ micAudioEnabled: v }),
+  setMicDevice: (d) => set({ micDevice: d }),
 
   // Save the current window size/position BEFORE any recording flow starts
   // Only save if we don't already have a saved state (prevent overwriting)

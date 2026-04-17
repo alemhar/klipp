@@ -4,6 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { useGlobalShortcut } from "../../hooks/useGlobalShortcut";
+import { AudioLevelIndicator } from "./AudioLevelIndicator";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -14,7 +15,7 @@ function formatTime(seconds: number): string {
 }
 
 export function RecordingControls() {
-  const { isRecording, elapsedSeconds, stopRecording, tick } = useRecordingStore();
+  const { isRecording, elapsedSeconds, stopRecording, tick, micAudioEnabled } = useRecordingStore();
 
   // On mount: shrink window to small pill, always on top
   useEffect(() => {
@@ -23,10 +24,10 @@ export function RecordingControls() {
     const setup = async () => {
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(true);
-      await mainWindow.setSize({ type: "Logical", width: 360, height: 50 });
+      await mainWindow.setSize({ type: "Logical", width: 400, height: 50 });
       await mainWindow.setPosition({
         type: "Logical",
-        x: Math.round(screen.width / 2 - 180),
+        x: Math.round(screen.width / 2 - 200),
         y: 10,
       });
       await mainWindow.setFocus();
@@ -47,11 +48,13 @@ export function RecordingControls() {
   const handleArrow = useCallback(() => emit("overlay-set-tool", "arrow"), []);
   const handleClear = useCallback(() => emit("overlay-clear"), []);
   const handleWebcam = useCallback(() => emit("overlay-toggle-webcam"), []);
+  const handleCyclePos = useCallback(() => emit("overlay-cycle-webcam-position"), []);
 
   useGlobalShortcut("Ctrl+Shift+R", handleRectangle, isRecording);
   useGlobalShortcut("Ctrl+Shift+A", handleArrow, isRecording);
   useGlobalShortcut("Ctrl+Shift+Z", handleClear, isRecording);
   useGlobalShortcut("Ctrl+Shift+W", handleWebcam, isRecording);
+  useGlobalShortcut("Ctrl+Shift+E", handleCyclePos, isRecording);
 
   if (!isRecording) return null;
 
@@ -113,6 +116,11 @@ export function RecordingControls() {
         {formatTime(elapsedSeconds)}
       </span>
 
+      {/* Audio level indicator — visible during recording when MIC is enabled */}
+      {micAudioEnabled && (
+        <AudioLevelIndicator active={micAudioEnabled} width={36} height={20} />
+      )}
+
       {/* Annotation tool buttons */}
       <button
         onClick={() => emit("overlay-set-tool", "rectangle")}
@@ -147,7 +155,7 @@ export function RecordingControls() {
       {/* Stop button */}
       <button
         onClick={stopRecording}
-        title="Stop Recording"
+        title="Stop Recording (Ctrl+Shift+S)"
         style={{
           display: "flex",
           alignItems: "center",
