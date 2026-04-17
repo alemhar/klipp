@@ -1,6 +1,6 @@
 # Plan 05 — Timeout Investigation
 
-> **Status**: ✅ Partially resolved 2026-04-17 — See "Findings" section below. Root cause of the user-visible "Monitor timed out" message was **Claude Code's Monitor tool, not the app itself**. No app-level timeout has been reproduced. Keeping this doc open in case a genuine app timeout surfaces later.
+> **Status**: ✅ Partially resolved 2026-04-17 — commit `251a00f`. See "Findings" section below. Root cause of the user-visible "Monitor timed out" message was **Claude Code's Monitor tool, not the app itself**. No app-level timeout has been reproduced. Keeping this doc open in case a genuine app timeout surfaces later.
 
 ## Findings (2026-04-17)
 

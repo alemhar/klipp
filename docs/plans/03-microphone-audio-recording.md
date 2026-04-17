@@ -1,5 +1,7 @@
 # Plan 03 — Microphone Audio Recording
 
+> **Status**: ✅ Partially completed 2026-04-17 — commit `c943015`. MIC recording + audio level indicator shipped. System-audio (SYS) toggle deferred to a future release because `virtual-audio-capturer` isn't commonly installed; UI wiring and Rust backend are in place but the button is disabled with a "coming in a future release" tooltip. Re-enable once a native WASAPI-loopback implementation is added.
+
 ## Context
 
 Currently FFmpeg captures only **system audio** via a hardcoded `audio=virtual-audio-capturer` DirectShow device, and only when `captureAudio` is `true` in the recording config. There's no way to record microphone audio, no device selection UI, and in fact the UI hardcodes `captureAudio: false` (audio isn't even enabled today).

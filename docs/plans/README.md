@@ -10,14 +10,14 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 2. [02 — Recording Region Outline](./02-recording-region-outline.md) ✅
    Visible light gray dashed border around the recording region.
 
-3. [03 — Microphone Audio Recording](./03-microphone-audio-recording.md)
-   Separate mic + system audio toggles, device selection, FFmpeg mixing.
+3. [03 — Microphone Audio Recording](./03-microphone-audio-recording.md) ✅ (SYS deferred)
+   Separate mic + system audio toggles, device selection, FFmpeg mixing. MIC shipped with live audio level indicator. SYS deferred to a future release.
 
 4. [04 — Phase 6: Region-Sized Overlay + DPI + Multi-Monitor](./04-phase-6-region-sizing-and-dpi.md)
    Replace fullscreen overlay with region-sized window. Fixes DPI issues and the latent gdigrab bug. Revisits Plans 01 and 02 to adapt to the new coordinate system.
 
-5. [05 — Timeout Investigation](./05-timeout-investigation.md)
-   Research task. Identify root cause of timeout errors, document findings.
+5. [05 — Timeout Investigation](./05-timeout-investigation.md) ✅ (no app bug)
+   Research task. Root cause was Claude Code's Monitor tool, not the SnippingZo app. No code change required.
 
 6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md)
    Known bug — pill buttons can't be clicked while a drawing tool is active. Floating toolbar on overlay as primary fix. Do last; Phase 6 (Plan 04) may partially resolve it.
