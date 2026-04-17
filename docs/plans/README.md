@@ -22,7 +22,7 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md)
    Known bug — pill buttons can't be clicked while a drawing tool is active. Floating toolbar on overlay as primary fix. Do last; Phase 6 (Plan 04) may partially resolve it.
 
-7. [07 — Context-Aware `Ctrl+Shift+S` (Screenshot / Stop Recording)](./07-stop-recording-hotkey.md)
+7. [07 — Context-Aware `Ctrl+Shift+S` (Screenshot / Stop Recording)](./07-stop-recording-hotkey.md) ✅
    Reuses the existing capture shortcut as a state-dependent toggle: takes a screenshot when idle, stops the recording when one is active. Provides keyboard escape for the Plan 06 blocking bug.
 
 ## Dependencies

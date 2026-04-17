@@ -1,5 +1,7 @@
 # Plan 07 — Context-Aware `Ctrl+Shift+S` (Screenshot / Stop Recording)
 
+> **Status**: ✅ Completed 2026-04-17 — commit `040624a`
+
 ## Context
 
 The `captureShortcut` (default `Ctrl+Shift+S`) currently only triggers screenshot capture, and it's registered globally the whole time settings are loaded — even during recording. This has two problems:
