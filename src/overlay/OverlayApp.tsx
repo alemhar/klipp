@@ -286,6 +286,32 @@ export default function OverlayApp() {
           </div>
         )}
 
+        {/* Recording region outline — sits just outside the region so the border
+            isn't captured by FFmpeg. Falls back to on-the-edge if the region
+            touches the screen boundary. */}
+        {(() => {
+          const canExpandLeft = region.x >= 2;
+          const canExpandTop = region.y >= 2;
+          const canExpandRight = region.x + region.width + 2 <= window.innerWidth;
+          const canExpandBottom = region.y + region.height + 2 <= window.innerHeight;
+          return (
+            <div
+              style={{
+                position: "absolute",
+                left: canExpandLeft ? region.x - 2 : region.x,
+                top: canExpandTop ? region.y - 2 : region.y,
+                width: region.width + (canExpandLeft ? 2 : 0) + (canExpandRight ? 2 : 0),
+                height: region.height + (canExpandTop ? 2 : 0) + (canExpandBottom ? 2 : 0),
+                border: "2px dashed #d1d5db",
+                boxSizing: "border-box",
+                pointerEvents: "none",
+                zIndex: 1,
+              }}
+            />
+          );
+        })()}
+
+
         {/* Click ripples */}
         {ripples.map((ripple) => (
           <div

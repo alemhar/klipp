@@ -8,7 +8,7 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
    `Ctrl+Shift+E` to cycle webcam bubble through four corners of the recording region.
 
 2. [02 — Recording Region Outline](./02-recording-region-outline.md)
-   Visible red dashed border around the recording region.
+   Visible light gray dashed border around the recording region.
 
 3. [03 — Microphone Audio Recording](./03-microphone-audio-recording.md)
    Separate mic + system audio toggles, device selection, FFmpeg mixing.
@@ -18,6 +18,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 
 5. [05 — Timeout Investigation](./05-timeout-investigation.md)
    Research task. Identify root cause of timeout errors, document findings.
+
+6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md)
+   Known bug — pill buttons can't be clicked while a drawing tool is active. Floating toolbar on overlay as primary fix. Do last; Phase 6 (Plan 04) may partially resolve it.
 
 ## Dependencies
 
@@ -29,7 +32,9 @@ Plan 03 (microphone)  ── independent, can run in parallel with others
 
 Plan 04 (Phase 6)     ── revisits Plans 01 and 02 to adapt to window-local coords
 
-Plan 05 (timeout)     ── last, independent research task
+Plan 05 (timeout)     ── independent research task
+
+Plan 06 (pill bug)    ── after Plan 04 (Phase 6 may partially fix), last
 ```
 
 ## Status Tracking
