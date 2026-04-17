@@ -1,5 +1,7 @@
 # Plan 02 — Recording Region Outline
 
+> **Status**: ✅ Completed 2026-04-17 — commit `7c6a75b`
+
 ## Context
 
 During recording, the user can't see the bounds of the selected region because the overlay is transparent. They need a visible outline around the recording region so they know what's being captured.
