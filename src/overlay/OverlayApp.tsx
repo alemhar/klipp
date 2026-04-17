@@ -37,8 +37,8 @@ export default function OverlayApp() {
   };
 
   const [webcamPos, setWebcamPos] = useState({
-    x: region.x + region.width - 200,
-    y: region.y + region.height - 200,
+    x: region.x + region.width - 175,
+    y: region.y + region.height - 175,
   });
   const [draggingWebcam, setDraggingWebcam] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
