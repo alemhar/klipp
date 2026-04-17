@@ -1,6 +1,38 @@
 # Plan 05 — Timeout Investigation
 
-## Context
+> **Status**: ✅ Partially resolved 2026-04-17 — See "Findings" section below. Root cause of the user-visible "Monitor timed out" message was **Claude Code's Monitor tool, not the app itself**. No app-level timeout has been reproduced. Keeping this doc open in case a genuine app timeout surfaces later.
+
+## Findings (2026-04-17)
+
+### What was reported
+User repeatedly saw "Monitor timed out — re-arm if needed." messages during Plan 01–04 development and assumed they were from the SnippingZo app itself.
+
+### Root cause
+The message comes from **Claude Code's `Monitor` tool** that the assistant uses to watch long-running background processes (like `npm run tauri dev`). It's an internal Claude Code tooling message surfaced in chat, not output from SnippingZo's Rust/React code.
+
+**Distinguishing features**:
+- Format: `Monitor timed out — re-arm if needed.`
+- Appears inside a `<task-notification>` block tagged with a task ID like `b76jyj6tx`.
+- Happens on a schedule (default ~300 seconds of no matching log output) regardless of what the app is doing.
+- The app continues running normally after the message — closing/reopening the app has no effect on it.
+
+**App-side**: there is currently **no reproducible app-level timeout**. None of the suspects below (`mpsc::channel` recv in `show_overlay`, WebView2 init stall, mouse-hook thread pump, Vite HMR) have surfaced a real failure during Plan 01, 02, or Plan 03 Step A testing.
+
+### Verdict
+No code change needed in SnippingZo. The documented suspects remain valid design concerns — any of them could cause a real timeout if conditions change — but they are not observed today.
+
+### When to reopen
+Revisit this plan if the user sees timeouts:
+- **In the app's DevTools console** (not in the Claude Code chat stream).
+- **In the terminal running `tauri dev`** as an error or panic.
+- **As an invoke() rejection** with a message like "ipc timeout" or "command took too long".
+- **In the production build** (`npm run tauri build`) which bypasses Claude Code's Monitor entirely.
+
+If any of those appear, proceed with the investigation checklist below.
+
+---
+
+## Context (Original Plan)
 
 During development, timeout errors have been observed in the app. Need to determine:
 
@@ -52,6 +84,10 @@ This isn't exactly a timeout, but it could manifest as "overlay shows but no rip
 - Vite HMR reloads when files change can cause the overlay React app to reload, triggering `start_mouse_hook` again.
 - File watcher triggering a Rust rebuild while recording is active would kill the dev binary.
 - `cargo run` warm-up on first compile is slow and can mask real timeouts.
+
+### Suspect 5 (ruled out): Claude Code Monitor tool
+
+Addressed in "Findings" above. This was the actual source of the user's reported "Monitor timed out" messages. Not an app bug.
 
 ## Investigation Checklist
 
