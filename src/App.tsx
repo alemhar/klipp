@@ -47,9 +47,10 @@ function App() {
   };
   const { settings, isLoaded, loadSettings } = useSettingsStore();
 
-  // Load settings on mount
+  // Load settings + enumerate audio inputs on mount
   useEffect(() => {
     loadSettings();
+    useRecordingStore.getState().loadAudioInputs();
 
     // Apply theme
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;

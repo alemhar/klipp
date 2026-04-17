@@ -14,7 +14,7 @@ interface RegionState {
 }
 
 export function RecordingRegionSelector() {
-  const { setIsSelectingRegion, startRecording, webcamEnabled } = useRecordingStore();
+  const { setIsSelectingRegion, startRecording, webcamEnabled, systemAudioEnabled, micAudioEnabled, micDevice } = useRecordingStore();
   const [screenshotBg, setScreenshotBg] = useState<string | null>(null);
   const [region, setRegion] = useState<RegionState>({
     startX: 0,
@@ -128,7 +128,9 @@ export function RecordingRegionSelector() {
         height: evenH,
         fps: 30,
         outputPath: outputPath,
-        captureAudio: false,
+        systemAudio: systemAudioEnabled,
+        micAudio: micAudioEnabled,
+        micDevice: micDevice,
         webcamEnabled: webcamEnabled,
         webcamSize: 150,
         webcamPosition: "bottom-right",

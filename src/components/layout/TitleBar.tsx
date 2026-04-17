@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useUIStore } from "../../stores/uiStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
+import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
@@ -96,7 +97,20 @@ export function TitleBar() {
   const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } =
     useUIStore();
   const { mode, delay, setMode, setDelay } = useCaptureStore();
-  const { isRecording, setIsSelectingRegion, checkFfmpeg, saveWindowState, webcamEnabled, setWebcamEnabled } = useRecordingStore();
+  const {
+    isRecording,
+    setIsSelectingRegion,
+    checkFfmpeg,
+    saveWindowState,
+    webcamEnabled,
+    setWebcamEnabled,
+    // System audio is deferred to a future release — see SYS button TODO below.
+    // Store fields `systemAudioEnabled`, `setSystemAudioEnabled`, `hasSystemAudioCapture`
+    // remain available; re-destructure them when re-enabling the feature.
+    micAudioEnabled,
+    setMicAudioEnabled,
+    hasMicrophone,
+  } = useRecordingStore();
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -234,6 +248,75 @@ export function TitleBar() {
         >
           CAM
         </button>
+
+        {/* System audio toggle — deferred to a future release.
+            TODO(next release): re-enable once we implement system-audio capture
+            without requiring the third-party "virtual-audio-capturer" DirectShow
+            driver (e.g. via native WASAPI loopback). See Plan 03 doc. The state,
+            store fields (hasSystemAudioCapture, systemAudioEnabled) and Rust
+            backend support are already wired — just remove this override. */}
+        <button
+          title="System Audio — coming in a future release"
+          onClick={() => { /* intentionally disabled until next release */ }}
+          disabled
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            border: "none",
+            cursor: "not-allowed",
+            backgroundColor: "transparent",
+            color: "var(--text-tertiary, #999)",
+            fontSize: 11,
+            fontWeight: 600,
+            opacity: 0.5,
+          }}
+        >
+          SYS
+        </button>
+
+        {/* Microphone toggle — disabled if no audio input device exists */}
+        <button
+          title={
+            !hasMicrophone
+              ? "No microphone detected"
+              : micAudioEnabled
+              ? "Microphone: ON"
+              : "Microphone: OFF"
+          }
+          onClick={() => hasMicrophone && setMicAudioEnabled(!micAudioEnabled)}
+          disabled={!hasMicrophone}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
+            borderRadius: 6,
+            border: "none",
+            cursor: hasMicrophone ? "pointer" : "not-allowed",
+            backgroundColor:
+              micAudioEnabled && hasMicrophone ? "rgba(0,120,212,0.15)" : "transparent",
+            color: !hasMicrophone
+              ? "var(--text-tertiary, #999)"
+              : micAudioEnabled
+              ? "var(--accent-color)"
+              : "var(--text-secondary)",
+            fontSize: 11,
+            fontWeight: 600,
+            opacity: hasMicrophone ? 1 : 0.5,
+          }}
+        >
+          MIC
+        </button>
+
+        {/* Audio level indicator — visible when MIC is enabled */}
+        {micAudioEnabled && hasMicrophone && (
+          <AudioLevelIndicator active={micAudioEnabled} width={44} height={20} />
+        )}
 
         {/* Record button */}
         <button

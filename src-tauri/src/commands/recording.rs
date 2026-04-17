@@ -14,7 +14,9 @@ pub struct RecordingConfig {
     pub height: i32,
     pub fps: u32,
     pub output_path: String,
-    pub capture_audio: bool,
+    pub system_audio: bool,
+    pub mic_audio: bool,
+    pub mic_device: Option<String>, // None = use first available audio input
     pub webcam_enabled: bool,
     pub webcam_size: i32,
     pub webcam_position: String, // "bottom-right", "bottom-left", "top-right", "top-left"
@@ -53,6 +55,35 @@ pub fn list_webcams(app: AppHandle) -> Result<Vec<String>, String> {
             && !line.contains("Alternative name")
         {
             // Extract device name between quotes
+            if let Some(start) = line.find('"') {
+                if let Some(end) = line[start + 1..].find('"') {
+                    devices.push(line[start + 1..start + 1 + end].to_string());
+                }
+            }
+        }
+    }
+
+    Ok(devices)
+}
+
+/// List available audio input devices (microphones, line-ins, virtual captures)
+#[tauri::command]
+pub fn list_audio_inputs(app: AppHandle) -> Result<Vec<String>, String> {
+    let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
+    let output = Command::new(&ffmpeg_path)
+        .args(["-list_devices", "true", "-f", "dshow", "-i", "dummy"])
+        .output()
+        .map_err(|e| format!("Failed to list devices: {}", e))?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut devices = Vec::new();
+
+    for line in stderr.lines() {
+        // Audio-only devices: "(audio)" and not "(video)", skip duplicate "Alternative name" rows
+        if line.contains("(audio)")
+            && !line.contains("(video)")
+            && !line.contains("Alternative name")
+        {
             if let Some(start) = line.find('"') {
                 if let Some(end) = line[start + 1..].find('"') {
                     devices.push(line[start + 1..start + 1 + end].to_string());
@@ -112,41 +143,113 @@ pub fn start_recording(
         }
     }
 
-    // Audio capture if requested
-    if config.capture_audio {
+    // Track which FFmpeg input indices hold audio streams, so we can map them.
+    // Input 0 = screen. If webcam added, input 1 = webcam. Audio inputs come next.
+    let mut next_input_idx: usize = if webcam_added { 2 } else { 1 };
+    let mut audio_inputs: Vec<usize> = Vec::new();
+
+    // Input: system audio (virtual-audio-capturer, from Screen Capturer Recorder)
+    // Validate the driver is actually installed before FFmpeg fails opaquely.
+    if config.system_audio {
+        let devices = list_audio_inputs(app.clone()).unwrap_or_default();
+        if !devices.iter().any(|d| d == "virtual-audio-capturer") {
+            return Err(
+                "System audio requires the 'virtual-audio-capturer' DirectShow driver, \
+                 which is not installed. Install Screen Capturer Recorder to enable this feature."
+                    .into(),
+            );
+        }
         args.extend_from_slice(&[
             "-f".into(),
             "dshow".into(),
             "-i".into(),
             "audio=virtual-audio-capturer".into(),
         ]);
+        audio_inputs.push(next_input_idx);
+        next_input_idx += 1;
     }
 
-    // Filter: overlay webcam as circle if we successfully added a webcam input
+    // Input: microphone
+    if config.mic_audio {
+        // Resolve device: explicit from config, or first available audio input
+        let device = match &config.mic_device {
+            Some(d) => Some(d.clone()),
+            None => list_audio_inputs(app.clone())
+                .ok()
+                .and_then(|devices| devices.into_iter().next()),
+        };
+        if let Some(device) = device {
+            args.extend_from_slice(&[
+                "-f".into(),
+                "dshow".into(),
+                "-i".into(),
+                format!("audio={}", device),
+            ]);
+            audio_inputs.push(next_input_idx);
+            next_input_idx += 1;
+        }
+        // If no mic device available, silently skip (graceful degradation)
+    }
+
+    // Build filter_complex (webcam overlay + audio mix), and track whether we
+    // need to map explicit [vout]/[aout] labels.
+    let mut filter_parts: Vec<String> = Vec::new();
+    let mut has_vout_label = false;
+    let mut has_aout_label = false;
+
+    // Video filter: overlay circular webcam on the screen capture
     if webcam_added {
         let margin = 20;
         let cam_s = config.webcam_size;
-
-        // Calculate overlay position
         let (ox, oy) = match config.webcam_position.as_str() {
             "bottom-left" => (margin, config.height - cam_s - margin),
             "top-right" => (config.width - cam_s - margin, margin),
             "top-left" => (margin, margin),
-            _ => (config.width - cam_s - margin, config.height - cam_s - margin), // bottom-right default
+            _ => (config.width - cam_s - margin, config.height - cam_s - margin),
         };
-
-        // Create circular mask using geq filter and overlay
-        // Scale webcam, make it circular, overlay on screen capture
-        let filter = format!(
-            "[1:v]scale={s}:{s},format=yuva420p,geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(lte(pow(X-{r},2)+pow(Y-{r},2),pow({r},2)),255,0)'[cam];[0:v][cam]overlay={ox}:{oy}",
+        filter_parts.push(format!(
+            "[1:v]scale={s}:{s},format=yuva420p,geq=lum='p(X,Y)':cb='p(X,Y)':cr='p(X,Y)':a='if(lte(pow(X-{r},2)+pow(Y-{r},2),pow({r},2)),255,0)'[cam];[0:v][cam]overlay={ox}:{oy}[vout]",
             s = cam_s,
             r = cam_s / 2,
             ox = ox,
             oy = oy
-        );
-
-        args.extend_from_slice(&["-filter_complex".into(), filter, "-map".into(), "0:a?".into()]);
+        ));
+        has_vout_label = true;
     }
+
+    // Audio filter: mix multiple audio inputs via amix
+    if audio_inputs.len() >= 2 {
+        let inputs_str: String = audio_inputs
+            .iter()
+            .map(|i| format!("[{}:a]", i))
+            .collect::<Vec<_>>()
+            .join("");
+        filter_parts.push(format!(
+            "{}amix=inputs={}:duration=longest:dropout_transition=0[aout]",
+            inputs_str,
+            audio_inputs.len()
+        ));
+        has_aout_label = true;
+    }
+
+    if !filter_parts.is_empty() {
+        args.push("-filter_complex".into());
+        args.push(filter_parts.join(";"));
+    }
+
+    // Map outputs
+    if has_vout_label {
+        args.extend_from_slice(&["-map".into(), "[vout]".into()]);
+    } else {
+        args.extend_from_slice(&["-map".into(), "0:v".into()]);
+    }
+    match audio_inputs.len() {
+        0 => {} // no audio
+        1 => args.extend_from_slice(&["-map".into(), format!("{}:a", audio_inputs[0])]),
+        _ => args.extend_from_slice(&["-map".into(), "[aout]".into()]),
+    }
+    // has_aout_label is only used for readability; map logic handles it above
+    let _ = has_aout_label;
 
     // Output encoding
     args.extend_from_slice(&[
@@ -165,7 +268,7 @@ pub fn start_recording(
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("Failed to start FFmpeg: {}. Is FFmpeg installed?", e))?;
 
