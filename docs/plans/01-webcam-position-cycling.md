@@ -4,7 +4,7 @@
 
 The overlay has a draggable circular webcam bubble that defaults to the bottom-right of the recording region. Users want a keyboard shortcut to quickly snap the webcam to one of the four corners of the recording region without manual dragging.
 
-**Trigger**: `Ctrl+Shift+P` global shortcut (registered only while recording).
+**Trigger**: `Ctrl+Shift+E` global shortcut (registered only while recording).
 
 **Cycle order**: Bottom-right (default) → Bottom-left → Top-left → Top-right → back to Bottom-right.
 
@@ -96,7 +96,7 @@ Register the global shortcut alongside the existing ones:
 
 ```tsx
 const handleCyclePos = useCallback(() => emit("overlay-cycle-webcam-position"), []);
-useGlobalShortcut("Ctrl+Shift+P", handleCyclePos, isRecording);
+useGlobalShortcut("Ctrl+Shift+E", handleCyclePos, isRecording);
 ```
 
 Optional: add a small icon button next to the existing camera button in the recording pill for discoverability. Use a lucide icon like `RotateCw` or similar.
@@ -105,12 +105,12 @@ Optional: add a small icon button next to the existing camera button in the reco
 
 1. Start a region recording.
 2. Press `Ctrl+Shift+W` to show the webcam bubble (defaults to bottom-right).
-3. Press `Ctrl+Shift+P` — webcam jumps to bottom-left.
+3. Press `Ctrl+Shift+E` — webcam jumps to bottom-left.
 4. Press again — top-left.
 5. Press again — top-right.
 6. Press again — back to bottom-right.
 7. Manually drag the webcam to a custom location.
-8. Press `Ctrl+Shift+P` — webcam jumps to bottom-right (resets from freeform).
+8. Press `Ctrl+Shift+E` — webcam jumps to bottom-right (resets from freeform).
 9. Confirm the webcam stays within the recording region at each corner position.
 10. Confirm FFmpeg captures the webcam in the final video at each corner.
 
@@ -133,7 +133,7 @@ Optional: add a small icon button next to the existing camera button in the reco
 ## Commit Message Draft
 
 ```
-feat: webcam position cycling hotkey (Ctrl+Shift+P)
+feat: webcam position cycling hotkey (Ctrl+Shift+E)
 
 Adds global shortcut to cycle webcam bubble through four corners
 of the recording region: bottom-right → bottom-left → top-left →

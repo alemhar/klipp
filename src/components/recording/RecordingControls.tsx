@@ -47,11 +47,13 @@ export function RecordingControls() {
   const handleArrow = useCallback(() => emit("overlay-set-tool", "arrow"), []);
   const handleClear = useCallback(() => emit("overlay-clear"), []);
   const handleWebcam = useCallback(() => emit("overlay-toggle-webcam"), []);
+  const handleCyclePos = useCallback(() => emit("overlay-cycle-webcam-position"), []);
 
   useGlobalShortcut("Ctrl+Shift+R", handleRectangle, isRecording);
   useGlobalShortcut("Ctrl+Shift+A", handleArrow, isRecording);
   useGlobalShortcut("Ctrl+Shift+Z", handleClear, isRecording);
   useGlobalShortcut("Ctrl+Shift+W", handleWebcam, isRecording);
+  useGlobalShortcut("Ctrl+Shift+E", handleCyclePos, isRecording);
 
   if (!isRecording) return null;
 
