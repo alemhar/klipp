@@ -1,5 +1,7 @@
 # Plan 01 — Webcam Position Cycling Hotkey
 
+> **Status**: ✅ Completed 2026-04-17 — commit `c8fefd0`
+
 ## Context
 
 The overlay has a draggable circular webcam bubble that defaults to the bottom-right of the recording region. Users want a keyboard shortcut to quickly snap the webcam to one of the four corners of the recording region without manual dragging.

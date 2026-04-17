@@ -4,7 +4,7 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 
 ## Execution Order
 
-1. [01 — Webcam Position Cycling Hotkey](./01-webcam-position-cycling.md)
+1. [01 — Webcam Position Cycling Hotkey](./01-webcam-position-cycling.md) ✅
    `Ctrl+Shift+E` to cycle webcam bubble through four corners of the recording region.
 
 2. [02 — Recording Region Outline](./02-recording-region-outline.md)
