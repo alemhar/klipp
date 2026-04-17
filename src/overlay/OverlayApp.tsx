@@ -86,7 +86,7 @@ export default function OverlayApp() {
     }
   }, [webcamCorner, region.x, region.y, region.width, region.height]);
 
-  // Listen for cycle webcam position events (Ctrl+Shift+P)
+  // Listen for cycle webcam position events (Ctrl+Shift+E)
   useEffect(() => {
     const order: WebcamCorner[] = ["br", "bl", "tl", "tr"];
     const unlisten = listen("overlay-cycle-webcam-position", () => {
@@ -150,7 +150,7 @@ export default function OverlayApp() {
             dragOffset.current = { x: x - wp.x, y: y - wp.y };
             invoke("set_overlay_interactive", { interactive: true }).catch(console.error);
             setDraggingWebcam(true);
-            setWebcamCorner(null); // freeform — next Ctrl+Shift+P resets to br
+            setWebcamCorner(null); // freeform — next Ctrl+Shift+E resets to br
 
             const handleMove = (ev: MouseEvent) => {
               setWebcamPos({

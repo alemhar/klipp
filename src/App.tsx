@@ -59,8 +59,19 @@ function App() {
     useUIStore.getState().setResolvedTheme(theme);
   }, []);
 
-  // Handle capture shortcut — opens delay timer or snipping overlay
+  // Handle capture shortcut — context-aware:
+  // - when a recording is active, stops the recording (provides a keyboard
+  //   escape even if the pill's Stop button is blocked by an active drawing
+  //   tool — see docs/plans/06-pill-buttons-blocked-by-overlay.md)
+  // - otherwise, opens the delay timer or snipping overlay as before
+  // Uses getState() so the callback identity stays stable and the global
+  // shortcut isn't re-registered on every render.
   const handleCaptureShortcut = useCallback(() => {
+    const recording = useRecordingStore.getState();
+    if (recording.isRecording) {
+      recording.stopRecording();
+      return;
+    }
     if (delay > 0) {
       setIsDelaying(true);
     } else {

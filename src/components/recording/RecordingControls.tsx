@@ -155,7 +155,7 @@ export function RecordingControls() {
       {/* Stop button */}
       <button
         onClick={stopRecording}
-        title="Stop Recording"
+        title="Stop Recording (Ctrl+Shift+S)"
         style={{
           display: "flex",
           alignItems: "center",
