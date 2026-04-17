@@ -14,6 +14,7 @@ See [docs/plans/README.md](./plans/README.md) for the index and dependency graph
 | 4 | Phase 6: region-sized overlay + DPI + multi-monitor | [04-phase-6-region-sizing-and-dpi.md](./plans/04-phase-6-region-sizing-and-dpi.md) |
 | 5 | Timeout investigation (research) | [05-timeout-investigation.md](./plans/05-timeout-investigation.md) |
 | 6 | Fix: pill buttons blocked by active overlay tool | [06-pill-buttons-blocked-by-overlay.md](./plans/06-pill-buttons-blocked-by-overlay.md) |
+| 7 | Context-aware `Ctrl+Shift+S` (screenshot / stop recording) | [07-stop-recording-hotkey.md](./plans/07-stop-recording-hotkey.md) |
 
 ## Phase 6 Polish — grouped into Plan 04
 
