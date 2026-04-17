@@ -1,7 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder,
+};
 
 #[cfg(windows)]
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
@@ -51,6 +53,40 @@ unsafe extern "system" fn mouse_proc(n_code: i32, w_param: WPARAM, l_param: LPAR
 
 // ─── Overlay window commands ───
 
+/// Applies a fully transparent background to the overlay's WebView2 surface
+/// via the COREWEBVIEW2_DEFAULT_BACKGROUND_COLOR COM API. Must be called
+/// whenever the window's layered-transparency state may have been reset
+/// (e.g. after resize or after toggling set_ignore_cursor_events on Windows,
+/// which can cause the webview to fall back to an opaque default background).
+#[cfg(windows)]
+fn apply_webview_transparency(
+    overlay: &tauri::WebviewWindow,
+) -> Result<(), tauri::Error> {
+    overlay.with_webview(|webview: tauri::webview::PlatformWebview| {
+        unsafe {
+            use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller2;
+            use windows::core::Interface;
+
+            let controller = webview.controller();
+            let controller2: ICoreWebView2Controller2 = controller
+                .cast()
+                .expect("Failed to get ICoreWebView2Controller2");
+
+            let transparent_color =
+                webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_COLOR {
+                    A: 0,
+                    R: 0,
+                    G: 0,
+                    B: 0,
+                };
+            controller2
+                .SetDefaultBackgroundColor(transparent_color)
+                .expect("Failed to set transparent background");
+        }
+    })
+}
+
+
 #[tauri::command]
 pub async fn show_overlay(
     app: AppHandle,
@@ -65,14 +101,50 @@ pub async fn show_overlay(
         return Ok(());
     }
 
-    // Build overlay URL with region query params so the React app knows the recording area
+    // Compute the outline pad on each side. We expand the overlay window by
+    // OUTLINE_PAD pixels beyond the recording region (where screen space allows)
+    // so the region-outline border sits outside the capture. If the region
+    // touches the monitor edge on any side, pad on that side is 0 and the
+    // outline on that side falls back to being inside the recording.
+    const OUTLINE_PAD: i32 = 2;
+    let region_x = x.unwrap_or(0);
+    let region_y = y.unwrap_or(0);
+    let region_w = width.unwrap_or(1920).max(1);
+    let region_h = height.unwrap_or(1080).max(1);
+
+    // Query monitor bounds so we know where the screen edges are. Falls back
+    // to primary-resolution defaults if the query fails.
+    let (mon_x, mon_y, mon_w, mon_h) = app
+        .primary_monitor()
+        .ok()
+        .flatten()
+        .map(|m| {
+            let pos = m.position();
+            let sz = m.size();
+            (pos.x, pos.y, sz.width as i32, sz.height as i32)
+        })
+        .unwrap_or((0, 0, 1920, 1080));
+
+    let pad_left = if region_x - mon_x >= OUTLINE_PAD { OUTLINE_PAD } else { 0 };
+    let pad_top = if region_y - mon_y >= OUTLINE_PAD { OUTLINE_PAD } else { 0 };
+    let pad_right = if (mon_x + mon_w) - (region_x + region_w) >= OUTLINE_PAD {
+        OUTLINE_PAD
+    } else {
+        0
+    };
+    let pad_bottom = if (mon_y + mon_h) - (region_y + region_h) >= OUTLINE_PAD {
+        OUTLINE_PAD
+    } else {
+        0
+    };
+
+    // Build overlay URL. Frontend reads region + pad values to correctly size
+    // the region outline (inner edge aligned with the recorded region boundary).
     let url = format!(
-        "overlay.html?x={}&y={}&w={}&h={}",
-        x.unwrap_or(0),
-        y.unwrap_or(0),
-        width.unwrap_or(1920),
-        height.unwrap_or(1080),
+        "overlay.html?x={}&y={}&w={}&h={}&pl={}&pt={}&pr={}&pb={}",
+        region_x, region_y, region_w, region_h, pad_left, pad_top, pad_right, pad_bottom,
     );
+
 
     // Create the overlay window on the main thread via channel to avoid deadlocks.
     let (tx, rx) = mpsc::channel();
@@ -86,6 +158,11 @@ pub async fn show_overlay(
         )
         .title("")
         .decorations(false)
+        // Builder-level transparent(true) ensures the OS window is created with
+        // WS_EX_LAYERED, which is required for transparency to survive
+        // set_ignore_cursor_events toggles. The WebView2 COM DefaultBackgroundColor
+        // call below handles the webview's own background.
+        .transparent(true)
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
@@ -101,37 +178,46 @@ pub async fn show_overlay(
         .map_err(|e| e.to_string())?
         .map_err(|e: tauri::Error| e.to_string())?;
 
-    // Set WebView2 background to fully transparent via COM API
-    #[cfg(windows)]
-    {
-        overlay
-            .with_webview(|webview: tauri::webview::PlatformWebview| {
-                unsafe {
-                    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller2;
-                    use windows::core::Interface;
-
-                    let controller = webview.controller();
-                    let controller2: ICoreWebView2Controller2 =
-                        controller.cast().expect("Failed to get ICoreWebView2Controller2");
-
-                    let transparent_color =
-                        webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_COLOR {
-                            A: 0,
-                            R: 0,
-                            G: 0,
-                            B: 0,
-                        };
-                    controller2
-                        .SetDefaultBackgroundColor(transparent_color)
-                        .expect("Failed to set transparent background");
-                }
-            })
-            .map_err(|e: tauri::Error| e.to_string())?;
-    }
+    // Size overlay to match the (padded) recording region in physical pixels.
+    // gdigrab + mouse hook both use physical coords, so PhysicalPosition/Size
+    // keeps the coordinate contract consistent end-to-end. Must be applied
+    // BEFORE the WebView2 transparency COM call; a resize afterwards reverts it.
+    let win_x = region_x - pad_left;
+    let win_y = region_y - pad_top;
+    let win_w = (region_w + pad_left + pad_right).max(1) as u32;
+    let win_h = (region_h + pad_top + pad_bottom).max(1) as u32;
 
     overlay
-        .set_fullscreen(true)
+        .set_position(PhysicalPosition::new(win_x, win_y))
         .map_err(|e: tauri::Error| e.to_string())?;
+    overlay
+        .set_size(PhysicalSize::new(win_w, win_h))
+        .map_err(|e: tauri::Error| e.to_string())?;
+
+    // Windows adds invisible chrome around frameless Tauri/wry windows
+    // (typically 8px on left/right/bottom, 0 on top). set_position sets the
+    // OUTER position, but WebView2 renders inside the INNER area. Without
+    // compensation, the inner area is offset by the chrome amount, which
+    // pushes the region outline inside the captured region on the affected
+    // sides. Query the delta and re-position the outer window so the inner
+    // area lands exactly where we want it.
+    if let (Ok(outer_pos), Ok(inner_pos)) =
+        (overlay.outer_position(), overlay.inner_position())
+    {
+        let dx = inner_pos.x - outer_pos.x;
+        let dy = inner_pos.y - outer_pos.y;
+        if dx != 0 || dy != 0 {
+            overlay
+                .set_position(PhysicalPosition::new(win_x - dx, win_y - dy))
+                .map_err(|e: tauri::Error| e.to_string())?;
+        }
+    }
+
+    // Set WebView2 background to fully transparent via COM API, AFTER the resize
+    // so the controller state is applied to the final window dimensions.
+    #[cfg(windows)]
+    apply_webview_transparency(&overlay).map_err(|e| e.to_string())?;
+
     overlay
         .set_ignore_cursor_events(true)
         .map_err(|e: tauri::Error| e.to_string())?;
@@ -159,6 +245,11 @@ pub fn set_overlay_interactive(app: AppHandle, interactive: bool) -> Result<(), 
         overlay
             .set_ignore_cursor_events(!interactive)
             .map_err(|e: tauri::Error| e.to_string())?;
+        // Toggling the layered-transparent flag on Windows can cause the WebView2
+        // surface to revert to an opaque default background — re-apply transparency
+        // to keep the overlay see-through during drawing.
+        #[cfg(windows)]
+        apply_webview_transparency(&overlay).map_err(|e: tauri::Error| e.to_string())?;
     }
     Ok(())
 }

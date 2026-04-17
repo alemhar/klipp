@@ -16,16 +16,26 @@ type WebcamCorner = "br" | "bl" | "tl" | "tr";
 const WEBCAM_MARGIN = 25;
 const WEBCAM_SIZE = 150;
 
+/**
+ * Returns the webcam bubble position in window-local coordinates, sitting
+ * inside the recorded region (not in the outline pad area).
+ *
+ * The overlay window is slightly larger than the recording region (padded by
+ * `pad` pixels on each side where screen space allows) so the region outline
+ * border sits outside the capture. The webcam must stay inside the recorded
+ * region, so corners are offset inward by the pad amount.
+ */
 function cornerToPos(
   corner: WebcamCorner,
-  region: { x: number; y: number; width: number; height: number }
+  recorded: { width: number; height: number },
+  pad: { left: number; top: number; right: number; bottom: number }
 ) {
   const offset = WEBCAM_SIZE + WEBCAM_MARGIN;
   switch (corner) {
-    case "br": return { x: region.x + region.width - offset, y: region.y + region.height - offset };
-    case "bl": return { x: region.x + WEBCAM_MARGIN, y: region.y + region.height - offset };
-    case "tl": return { x: region.x + WEBCAM_MARGIN, y: region.y + WEBCAM_MARGIN };
-    case "tr": return { x: region.x + region.width - offset, y: region.y + WEBCAM_MARGIN };
+    case "br": return { x: pad.left + recorded.width - offset, y: pad.top + recorded.height - offset };
+    case "bl": return { x: pad.left + WEBCAM_MARGIN, y: pad.top + recorded.height - offset };
+    case "tl": return { x: pad.left + WEBCAM_MARGIN, y: pad.top + WEBCAM_MARGIN };
+    case "tr": return { x: pad.left + recorded.width - offset, y: pad.top + WEBCAM_MARGIN };
   }
 }
 
@@ -45,7 +55,12 @@ export default function OverlayApp() {
   const [drawing, setDrawing] = useState<Shape | null>(null);
   const [webcamVisible, setWebcamVisible] = useState(false);
 
-  // Read recording region from URL query params (set by show_overlay command)
+  // Read recording region + outline pad values from URL query params
+  // (set by show_overlay command). The overlay window is slightly larger than
+  // the recorded region (by pad pixels on each side, where screen space allows)
+  // so the outline border sits outside the captured area. Window-local origin
+  // (0,0) therefore corresponds to (region.x - padLeft, region.y - padTop) in
+  // screen coords.
   const params = new URLSearchParams(window.location.search);
   const region = {
     x: parseInt(params.get("x") || "0"),
@@ -53,9 +68,17 @@ export default function OverlayApp() {
     width: parseInt(params.get("w") || String(window.innerWidth)),
     height: parseInt(params.get("h") || String(window.innerHeight)),
   };
+  const pad = {
+    left: parseInt(params.get("pl") || "0"),
+    top: parseInt(params.get("pt") || "0"),
+    right: parseInt(params.get("pr") || "0"),
+    bottom: parseInt(params.get("pb") || "0"),
+  };
+  // Window origin in screen coords (for translating mouse-hook events)
+  const windowOrigin = { x: region.x - pad.left, y: region.y - pad.top };
 
   const [webcamCorner, setWebcamCorner] = useState<WebcamCorner | null>("br");
-  const [webcamPos, setWebcamPos] = useState(() => cornerToPos("br", region));
+  const [webcamPos, setWebcamPos] = useState(() => cornerToPos("br", region, pad));
   const [draggingWebcam, setDraggingWebcam] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -82,9 +105,9 @@ export default function OverlayApp() {
   // Sync webcamPos when corner is set via hotkey
   useEffect(() => {
     if (webcamCorner) {
-      setWebcamPos(cornerToPos(webcamCorner, region));
+      setWebcamPos(cornerToPos(webcamCorner, region, pad));
     }
-  }, [webcamCorner, region.x, region.y, region.width, region.height]);
+  }, [webcamCorner, region.x, region.y, region.width, region.height, pad.left, pad.top]);
 
   // Listen for cycle webcam position events (Ctrl+Shift+E)
   useEffect(() => {
@@ -137,22 +160,30 @@ export default function OverlayApp() {
     const unlisten = listen<{ x: number; y: number; button: string }>(
       "mouse-click",
       (event) => {
-        const { x, y, button } = event.payload;
+        const { x: screenX, y: screenY, button } = event.payload;
 
-        // Check if click is on the webcam bubble — if so, start drag
+        // Translate screen coords (from mouse hook) to window-local coords.
+        // The overlay window is positioned at windowOrigin (region minus pads),
+        // so window-local origin corresponds to the top-left of the window.
+        const localX = screenX - windowOrigin.x;
+        const localY = screenY - windowOrigin.y;
+
+        // Check if click is on the webcam bubble — if so, start drag.
+        // Both webcamPos and localX/Y are in window-local coords.
         if (webcamVisibleRef.current && button === "left") {
           const wp = webcamPosRef.current;
           const cx = wp.x + 75; // center of 150px bubble
           const cy = wp.y + 75;
-          const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+          const dist = Math.sqrt((localX - cx) ** 2 + (localY - cy) ** 2);
           if (dist <= 75) {
             // Click is on webcam — make overlay interactive and start drag
-            dragOffset.current = { x: x - wp.x, y: y - wp.y };
+            dragOffset.current = { x: localX - wp.x, y: localY - wp.y };
             invoke("set_overlay_interactive", { interactive: true }).catch(console.error);
             setDraggingWebcam(true);
             setWebcamCorner(null); // freeform — next Ctrl+Shift+E resets to br
 
             const handleMove = (ev: MouseEvent) => {
+              // ev.clientX/Y are already window-local (browser events)
               setWebcamPos({
                 x: ev.clientX - dragOffset.current.x,
                 y: ev.clientY - dragOffset.current.y,
@@ -174,7 +205,7 @@ export default function OverlayApp() {
         }
 
         const id = Date.now() + Math.random();
-        setRipples((prev) => [...prev.slice(-9), { id, x, y, button }]);
+        setRipples((prev) => [...prev.slice(-9), { id, x: localX, y: localY, button }]);
         setTimeout(() => {
           setRipples((prev) => prev.filter((r) => r.id !== id));
         }, 600);
@@ -286,30 +317,28 @@ export default function OverlayApp() {
           </div>
         )}
 
-        {/* Recording region outline — sits just outside the region so the border
-            isn't captured by FFmpeg. Falls back to on-the-edge if the region
-            touches the screen boundary. */}
-        {(() => {
-          const canExpandLeft = region.x >= 2;
-          const canExpandTop = region.y >= 2;
-          const canExpandRight = region.x + region.width + 2 <= window.innerWidth;
-          const canExpandBottom = region.y + region.height + 2 <= window.innerHeight;
-          return (
-            <div
-              style={{
-                position: "absolute",
-                left: canExpandLeft ? region.x - 2 : region.x,
-                top: canExpandTop ? region.y - 2 : region.y,
-                width: region.width + (canExpandLeft ? 2 : 0) + (canExpandRight ? 2 : 0),
-                height: region.height + (canExpandTop ? 2 : 0) + (canExpandBottom ? 2 : 0),
-                border: "2px dashed #d1d5db",
-                boxSizing: "border-box",
-                pointerEvents: "none",
-                zIndex: 1,
-              }}
-            />
-          );
-        })()}
+        {/* Recording region outline — the overlay window is padded by `pad`
+            pixels on each side beyond the recording region (where screen space
+            permits). We explicitly size the outline to the INTENDED window size
+            (pad + recorded region + pad) rather than relying on window.innerWidth
+            because the OS may clip the window near screen edges. With border-box
+            + 2px border, the inner edge aligns with the recorded region boundary,
+            putting the border in the pad area outside the capture. When a pad
+            is 0 (no screen room), the border on that side falls back to being
+            inside the recording and will be visible in the final video. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: pad.left + region.width + pad.right,
+            height: pad.top + region.height + pad.bottom,
+            border: "2px dashed #d1d5db",
+            boxSizing: "border-box",
+            pointerEvents: "none",
+            zIndex: 1,
+          }}
+        />
 
 
         {/* Click ripples */}
@@ -405,6 +434,10 @@ export default function OverlayApp() {
             top: webcamPos.y,
             width: 150,
             height: 150,
+            // border-box so the 3px border is drawn INSIDE the 150x150 bounds,
+            // keeping the bubble's visual size aligned with our corner math
+            // (which assumes a 150x150 total footprint).
+            boxSizing: "border-box",
             borderRadius: "50%",
             overflow: "hidden",
             border: "3px solid rgba(255,255,255,0.8)",
