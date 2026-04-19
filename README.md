@@ -130,7 +130,7 @@ Screenshot capture, annotations, and all related tools work out of the box.
 
 If you accidentally click **Block** and later want to enable it, the **CAM** or **MIC** button in the title bar will turn amber and its tooltip will say "Camera/Microphone blocked — click for help re-enabling". Clicking it opens a dialog with two recovery steps:
 1. Check **Windows Settings → Privacy & Security → Camera** (or **Microphone**) is on for desktop apps.
-2. If still blocked, clear the WebView2 cache folder at `%LOCALAPPDATA%\com.fuselabs.klipp\EBWebView\` and relaunch Klipp to re-prompt.
+2. If still blocked, clear the WebView2 cache folder at `%LOCALAPPDATA%\com.zyntaxzo.klipp\EBWebView\` and relaunch Klipp to re-prompt.
 
 ---
 

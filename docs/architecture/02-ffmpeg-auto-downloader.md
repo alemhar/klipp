@@ -66,7 +66,7 @@ The binary lives at:
 <app_data_dir>/ffmpeg/ffmpeg.exe
 ```
 
-Where `<app_data_dir>` on Windows resolves to `%APPDATA%\com.fuselabs.klipp\ffmpeg\ffmpeg.exe` via Tauri's `app.path().app_data_dir()`. Keeping it in the app's data directory (not `Program Files` or similar) means:
+Where `<app_data_dir>` on Windows resolves to `%APPDATA%\com.zyntaxzo.klipp\ffmpeg\ffmpeg.exe` via Tauri's `app.path().app_data_dir()`. Keeping it in the app's data directory (not `Program Files` or similar) means:
 
 - No elevated permissions required.
 - Cleanly uninstalls when the user removes the app directory.

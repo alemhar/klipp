@@ -140,7 +140,7 @@ export function PermissionBlockedModal({
                 whiteSpace: "nowrap",
               }}
             >
-              %LOCALAPPDATA%\com.fuselabs.klipp\EBWebView\
+              %LOCALAPPDATA%\com.zyntaxzo.klipp\EBWebView\
             </div>
           </li>
           <li>
