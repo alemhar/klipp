@@ -34,6 +34,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 10. [10 — Proactive FFmpeg First-Run UX](./10-ffmpeg-proactive-first-run-ux.md) 🚧
     Follow-up to the shipped minimal fix (spinner + auto-proceed). Adds a proactive install banner on startup so users never hit a mid-workflow stall waiting for FFmpeg.
 
+11. [11 — WebView2 Camera Permission Intercept](./11-webview2-permission-intercept.md) 🚧
+    Phase 2 of the camera-permission UX. The shipping build has a recovery modal + amber CAM icon when access is denied; this plan replaces the raw WebView2 permission dialog with a native Klipp prompt so users never see the localhost-looking browser dialog.
+
 ## Dependencies
 
 ```

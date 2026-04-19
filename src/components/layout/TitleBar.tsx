@@ -15,6 +15,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
+import { PermissionBlockedModal } from "../recording/PermissionBlockedModal";
+import { useMediaPermission } from "../../hooks/useMediaPermission";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
@@ -138,6 +140,13 @@ export function TitleBar() {
   };
 
   const [isInstallingFfmpeg, setIsInstallingFfmpeg] = useState(false);
+  const [blockedModal, setBlockedModal] = useState<
+    "camera" | "microphone" | null
+  >(null);
+  const cameraPermission = useMediaPermission("camera");
+  const microphonePermission = useMediaPermission("microphone");
+  const cameraBlocked = cameraPermission === "denied";
+  const microphoneBlocked = microphonePermission === "denied";
 
   // Check webcam availability and fall back gracefully if the user's camera
   // permission is off. Called after FFmpeg is confirmed present.
@@ -310,8 +319,20 @@ export function TitleBar() {
 
         {/* Webcam toggle */}
         <button
-          title={webcamEnabled ? "Webcam: ON" : "Webcam: OFF"}
-          onClick={() => setWebcamEnabled(!webcamEnabled)}
+          title={
+            cameraBlocked
+              ? "Camera blocked — click for help re-enabling"
+              : webcamEnabled
+              ? "Webcam: ON"
+              : "Webcam: OFF"
+          }
+          onClick={() => {
+            if (cameraBlocked) {
+              setBlockedModal("camera");
+              return;
+            }
+            setWebcamEnabled(!webcamEnabled);
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -321,8 +342,16 @@ export function TitleBar() {
             borderRadius: 6,
             border: "none",
             cursor: "pointer",
-            backgroundColor: webcamEnabled ? "rgba(0,120,212,0.15)" : "transparent",
-            color: webcamEnabled ? "var(--accent-color)" : "var(--text-secondary)",
+            backgroundColor: cameraBlocked
+              ? "rgba(245, 158, 11, 0.15)"
+              : webcamEnabled
+              ? "rgba(0,120,212,0.15)"
+              : "transparent",
+            color: cameraBlocked
+              ? "#f59e0b"
+              : webcamEnabled
+              ? "var(--accent-color)"
+              : "var(--text-secondary)",
             fontSize: 11,
             fontWeight: 600,
           }}
@@ -359,16 +388,26 @@ export function TitleBar() {
           SYS
         </button>
 
-        {/* Microphone toggle — disabled if no audio input device exists */}
+        {/* Microphone toggle — disabled if no audio input device exists,
+            amber + recovery modal if WebView2 mic permission is denied. */}
         <button
           title={
             !hasMicrophone
               ? "No microphone detected"
+              : microphoneBlocked
+              ? "Microphone blocked — click for help re-enabling"
               : micAudioEnabled
               ? "Microphone: ON"
               : "Microphone: OFF"
           }
-          onClick={() => hasMicrophone && setMicAudioEnabled(!micAudioEnabled)}
+          onClick={() => {
+            if (!hasMicrophone) return;
+            if (microphoneBlocked) {
+              setBlockedModal("microphone");
+              return;
+            }
+            setMicAudioEnabled(!micAudioEnabled);
+          }}
           disabled={!hasMicrophone}
           style={{
             display: "flex",
@@ -379,10 +418,17 @@ export function TitleBar() {
             borderRadius: 6,
             border: "none",
             cursor: hasMicrophone ? "pointer" : "not-allowed",
-            backgroundColor:
-              micAudioEnabled && hasMicrophone ? "rgba(0,120,212,0.15)" : "transparent",
+            backgroundColor: !hasMicrophone
+              ? "transparent"
+              : microphoneBlocked
+              ? "rgba(245, 158, 11, 0.15)"
+              : micAudioEnabled
+              ? "rgba(0,120,212,0.15)"
+              : "transparent",
             color: !hasMicrophone
               ? "var(--text-tertiary, #999)"
+              : microphoneBlocked
+              ? "#f59e0b"
               : micAudioEnabled
               ? "var(--accent-color)"
               : "var(--text-secondary)",
@@ -488,6 +534,13 @@ export function TitleBar() {
           <Settings size={16} />
         </button>
       </div>
+
+      {blockedModal && (
+        <PermissionBlockedModal
+          device={blockedModal}
+          onClose={() => setBlockedModal(null)}
+        />
+      )}
     </div>
   );
 }
