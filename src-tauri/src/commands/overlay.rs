@@ -107,7 +107,11 @@ pub async fn show_overlay(
     // so the region-outline border sits outside the capture. If the region
     // touches the monitor edge on any side, pad on that side is 0 and the
     // outline on that side falls back to being inside the recording.
-    const OUTLINE_PAD: i32 = 2;
+    //
+    // The pad is intentionally larger than strictly needed for a 2px border so
+    // that WebView2 content-shift on first interaction (~8px horizontally on
+    // this platform) doesn't push the outline into the captured region.
+    const OUTLINE_PAD: i32 = 10;
     let region_x = x.unwrap_or(0);
     let region_y = y.unwrap_or(0);
     let region_w = width.unwrap_or(1920).max(1);

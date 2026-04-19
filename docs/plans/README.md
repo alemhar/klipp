@@ -25,6 +25,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 7. [07 — Context-Aware `Ctrl+Shift+S` (Screenshot / Stop Recording)](./07-stop-recording-hotkey.md) ✅
    Reuses the existing capture shortcut as a state-dependent toggle: takes a screenshot when idle, stops the recording when one is active. Provides keyboard escape for the Plan 06 blocking bug.
 
+8. [08 — Root-Cause Fix: WebView2 Content Drift on First Interaction](./08-webview-content-drift-root-cause.md) 🚧
+   Root-cause fix for the ~8px WebView2 content drift that caused the region outline to be captured on one side. Current release ships a workaround (larger outline pad); proper fix via WndProc subclass or DWM frame extension deferred to a future release.
+
 ## Dependencies
 
 ```
