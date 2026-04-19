@@ -15,6 +15,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
+import { CameraBlockedModal } from "../recording/CameraBlockedModal";
+import { useCameraPermission } from "../../hooks/useCameraPermission";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
@@ -138,6 +140,9 @@ export function TitleBar() {
   };
 
   const [isInstallingFfmpeg, setIsInstallingFfmpeg] = useState(false);
+  const [showCameraBlockedModal, setShowCameraBlockedModal] = useState(false);
+  const cameraPermission = useCameraPermission();
+  const cameraBlocked = cameraPermission === "denied";
 
   // Check webcam availability and fall back gracefully if the user's camera
   // permission is off. Called after FFmpeg is confirmed present.
@@ -310,8 +315,20 @@ export function TitleBar() {
 
         {/* Webcam toggle */}
         <button
-          title={webcamEnabled ? "Webcam: ON" : "Webcam: OFF"}
-          onClick={() => setWebcamEnabled(!webcamEnabled)}
+          title={
+            cameraBlocked
+              ? "Camera blocked — click for help re-enabling"
+              : webcamEnabled
+              ? "Webcam: ON"
+              : "Webcam: OFF"
+          }
+          onClick={() => {
+            if (cameraBlocked) {
+              setShowCameraBlockedModal(true);
+              return;
+            }
+            setWebcamEnabled(!webcamEnabled);
+          }}
           style={{
             display: "flex",
             alignItems: "center",
@@ -321,8 +338,16 @@ export function TitleBar() {
             borderRadius: 6,
             border: "none",
             cursor: "pointer",
-            backgroundColor: webcamEnabled ? "rgba(0,120,212,0.15)" : "transparent",
-            color: webcamEnabled ? "var(--accent-color)" : "var(--text-secondary)",
+            backgroundColor: cameraBlocked
+              ? "rgba(245, 158, 11, 0.15)"
+              : webcamEnabled
+              ? "rgba(0,120,212,0.15)"
+              : "transparent",
+            color: cameraBlocked
+              ? "#f59e0b"
+              : webcamEnabled
+              ? "var(--accent-color)"
+              : "var(--text-secondary)",
             fontSize: 11,
             fontWeight: 600,
           }}
@@ -488,6 +513,10 @@ export function TitleBar() {
           <Settings size={16} />
         </button>
       </div>
+
+      {showCameraBlockedModal && (
+        <CameraBlockedModal onClose={() => setShowCameraBlockedModal(false)} />
+      )}
     </div>
   );
 }
