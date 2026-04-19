@@ -17,10 +17,23 @@ import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
-const CAPTURE_MODES: { mode: CaptureMode; label: string; icon: React.ReactNode }[] = [
-  { mode: "rectangular", label: "Rectangle", icon: <Square size={14} /> },
+const CAPTURE_MODES: {
+  mode: CaptureMode;
+  label: string;
+  icon: React.ReactNode;
+  disabled?: boolean;
+  disabledReason?: string;
+}[] = [
+  { mode: "rectangular", label: "Selection", icon: <Square size={14} /> },
   { mode: "fullscreen", label: "Fullscreen", icon: <Maximize size={14} /> },
-  { mode: "window", label: "Window", icon: <Square size={14} /> },
+  {
+    mode: "window",
+    label: "Window",
+    icon: <Square size={14} />,
+    disabled: true,
+    disabledReason:
+      "Window capture — coming in a future release.",
+  },
 ];
 
 const DELAY_OPTIONS: { value: DelayOption; label: string }[] = [
@@ -149,7 +162,9 @@ export function TitleBar() {
           {CAPTURE_MODES.map((m) => (
             <button
               key={m.mode}
-              onClick={() => setMode(m.mode)}
+              onClick={() => !m.disabled && setMode(m.mode)}
+              disabled={m.disabled}
+              title={m.disabled ? m.disabledReason : undefined}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -158,11 +173,19 @@ export function TitleBar() {
                 padding: "6px 8px",
                 borderRadius: 4,
                 border: "none",
-                cursor: "pointer",
-                backgroundColor: mode === m.mode ? "var(--accent-color)" : "transparent",
-                color: mode === m.mode ? "#fff" : "var(--text-primary)",
+                cursor: m.disabled ? "not-allowed" : "pointer",
+                backgroundColor:
+                  mode === m.mode && !m.disabled
+                    ? "var(--accent-color)"
+                    : "transparent",
+                color: m.disabled
+                  ? "var(--text-tertiary, #999)"
+                  : mode === m.mode
+                  ? "#fff"
+                  : "var(--text-primary)",
                 fontSize: 12,
                 textAlign: "left",
+                opacity: m.disabled ? 0.55 : 1,
               }}
             >
               {m.icon}

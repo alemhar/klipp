@@ -28,6 +28,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 8. [08 — Root-Cause Fix: WebView2 Content Drift on First Interaction](./08-webview-content-drift-root-cause.md) 🚧
    Root-cause fix for the ~8px WebView2 content drift that caused the region outline to be captured on one side. Current release ships a workaround (larger outline pad); proper fix via WndProc subclass or DWM frame extension deferred to a future release.
 
+9. [09 — Window Capture Mode](./09-window-capture-mode.md) 🚧
+   The capture-mode dropdown has a "Window" option that currently does nothing. Plan covers enumerating top-level windows, highlighting the one under cursor, and click-to-capture its bounds.
+
 ## Dependencies
 
 ```
