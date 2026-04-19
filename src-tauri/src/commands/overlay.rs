@@ -6,11 +6,12 @@ use tauri::{
 };
 
 #[cfg(windows)]
-use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 #[cfg(windows)]
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, SetWindowsHookExW, UnhookWindowsHookEx, HHOOK, MSLLHOOKSTRUCT,
-    WH_MOUSE_LL, WM_LBUTTONDOWN, WM_MBUTTONDOWN, WM_RBUTTONDOWN,
+    CallNextHookEx, GetWindowLongPtrW, SetWindowLongPtrW, SetWindowsHookExW, UnhookWindowsHookEx,
+    GWL_EXSTYLE, HHOOK, MSLLHOOKSTRUCT, WH_MOUSE_LL, WM_LBUTTONDOWN, WM_MBUTTONDOWN,
+    WM_RBUTTONDOWN, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
 
 static HOOK_ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -239,17 +240,54 @@ pub async fn hide_overlay(app: AppHandle) -> Result<(), String> {
 
 // ─── Overlay interactivity ───
 
+/// Toggles click-through on the overlay at the Win32 ex-style level while
+/// preserving WS_EX_LAYERED. Tauri/wry's `set_ignore_cursor_events` removes
+/// both WS_EX_TRANSPARENT AND WS_EX_LAYERED when deactivating click-through,
+/// which destroys WebView2's per-pixel transparency. Manipulating only
+/// WS_EX_TRANSPARENT keeps the window in layered mode so transparency
+/// survives the toggle.
+#[cfg(windows)]
+fn set_click_through_preserving_layered(
+    overlay: &tauri::WebviewWindow,
+    click_through: bool,
+) -> Result<(), String> {
+    let hwnd_raw = overlay.hwnd().map_err(|e| e.to_string())?;
+    let hwnd = HWND(hwnd_raw.0 as *mut _);
+    let layered = WS_EX_LAYERED.0 as isize;
+    let transparent = WS_EX_TRANSPARENT.0 as isize;
+    unsafe {
+        let current = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        // Always force WS_EX_LAYERED on; flip WS_EX_TRANSPARENT per request.
+        let new_style = if click_through {
+            (current | layered) | transparent
+        } else {
+            (current | layered) & !transparent
+        };
+        if new_style != current {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style);
+        }
+    }
+    Ok(())
+}
+
+
 #[tauri::command]
 pub fn set_overlay_interactive(app: AppHandle, interactive: bool) -> Result<(), String> {
     if let Some(overlay) = app.get_webview_window("overlay") {
+        // On Windows, bypass Tauri's set_ignore_cursor_events and toggle
+        // WS_EX_TRANSPARENT directly so WS_EX_LAYERED is preserved — otherwise
+        // WebView2 loses per-pixel transparency when switching to interactive.
+        #[cfg(windows)]
+        {
+            set_click_through_preserving_layered(&overlay, !interactive)?;
+            // Re-apply WebView2 DefaultBackgroundColor defensively in case the
+            // composition state was touched.
+            apply_webview_transparency(&overlay).map_err(|e: tauri::Error| e.to_string())?;
+        }
+        #[cfg(not(windows))]
         overlay
             .set_ignore_cursor_events(!interactive)
             .map_err(|e: tauri::Error| e.to_string())?;
-        // Toggling the layered-transparent flag on Windows can cause the WebView2
-        // surface to revert to an opaque default background — re-apply transparency
-        // to keep the overlay see-through during drawing.
-        #[cfg(windows)]
-        apply_webview_transparency(&overlay).map_err(|e: tauri::Error| e.to_string())?;
     }
     Ok(())
 }
