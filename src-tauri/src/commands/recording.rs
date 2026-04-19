@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::Mutex;
 use tauri::{AppHandle, State};
 
@@ -40,7 +40,7 @@ impl RecordingState {
 #[tauri::command]
 pub fn list_webcams(app: AppHandle) -> Result<Vec<String>, String> {
     let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
-    let output = Command::new(&ffmpeg_path)
+    let output = ffmpeg::hidden_command(&ffmpeg_path)
         .args(["-list_devices", "true", "-f", "dshow", "-i", "dummy"])
         .output()
         .map_err(|e| format!("Failed to list devices: {}", e))?;
@@ -70,7 +70,7 @@ pub fn list_webcams(app: AppHandle) -> Result<Vec<String>, String> {
 #[tauri::command]
 pub fn list_audio_inputs(app: AppHandle) -> Result<Vec<String>, String> {
     let ffmpeg_path = ffmpeg::get_ffmpeg_path_internal(&app)?;
-    let output = Command::new(&ffmpeg_path)
+    let output = ffmpeg::hidden_command(&ffmpeg_path)
         .args(["-list_devices", "true", "-f", "dshow", "-i", "dummy"])
         .output()
         .map_err(|e| format!("Failed to list devices: {}", e))?;
@@ -264,7 +264,7 @@ pub fn start_recording(
         config.output_path.clone(),
     ]);
 
-    let child = Command::new(&ffmpeg_path)
+    let child = ffmpeg::hidden_command(&ffmpeg_path)
         .args(&args)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
