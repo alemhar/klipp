@@ -30,7 +30,7 @@
         { "path": "$DOWNLOAD/**" },
         { "path": "$PICTURE/**" },
         { "path": "$DESKTOP/**" },
-        { "path": "$HOME/SnippingZo/**" }
+        { "path": "$HOME/Klipp/**" }
       ]
     },
     "shell:allow-open",

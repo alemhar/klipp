@@ -25,7 +25,7 @@ Mimics the Windows Snipping Tool's "Window Snip":
 
 Good to have (could be added later):
 - Filter to only highlight windows on the current monitor.
-- Exclude SnippingZo's own capture overlay from the window list (it's fullscreen and would always be "the window under cursor").
+- Exclude Klipp's own capture overlay from the window list (it's fullscreen and would always be "the window under cursor").
 - Visual feedback for child vs top-level windows (usually we only want top-level).
 
 ## Current State
@@ -64,7 +64,7 @@ pub fn list_top_level_windows() -> Result<Vec<WindowInfo>, String> {
 }
 ```
 
-Exclude the SnippingZo overlay: store its HWND in a `Mutex<Option<isize>>` when `show_overlay` runs (or look up by window label via Tauri's `get_webview_window("overlay").hwnd()`).
+Exclude the Klipp overlay: store its HWND in a `Mutex<Option<isize>>` when `show_overlay` runs (or look up by window label via Tauri's `get_webview_window("overlay").hwnd()`).
 
 ### 2. New Rust command: `capture_window_bounds`
 
@@ -92,7 +92,7 @@ Highlight style suggestions:
 - [ ] Move cursor over different windows → highlight follows, outlines visible window bounds.
 - [ ] Click a window → capture that window's bounds, not including the shadow.
 - [ ] Click on empty desktop → no highlight, no capture (or capture the desktop as fallback — decide during implementation).
-- [ ] SnippingZo's own main window doesn't appear as a target while in capture mode.
+- [ ] Klipp's own main window doesn't appear as a target while in capture mode.
 - [ ] Multi-monitor: highlighting works for windows on secondary monitors too.
 
 ## Out of Scope

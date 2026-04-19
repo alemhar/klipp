@@ -1,4 +1,4 @@
-export const APP_NAME = "SnippingZo";
+export const APP_NAME = "Klipp";
 
 export const DEFAULT_PEN_COLOR = "#FF0000";
 export const DEFAULT_PEN_WIDTH = 3;
