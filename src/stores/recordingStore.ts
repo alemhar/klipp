@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 
 interface RecordingConfig {
   x: number;
@@ -149,8 +149,8 @@ export const useRecordingStore = create<RecordingState>((set, get) => ({
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(false);
       if (saved) {
-        await mainWindow.setSize({ type: "Logical", width: saved.width, height: saved.height });
-        await mainWindow.setPosition({ type: "Logical", x: saved.x, y: saved.y });
+        await mainWindow.setSize(new LogicalSize(saved.width, saved.height));
+        await mainWindow.setPosition(new LogicalPosition(saved.x, saved.y));
       }
 
       set({ isRecording: false, config: null, savedWindowState: null });
