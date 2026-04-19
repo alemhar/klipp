@@ -15,8 +15,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
-import { CameraBlockedModal } from "../recording/CameraBlockedModal";
-import { useCameraPermission } from "../../hooks/useCameraPermission";
+import { PermissionBlockedModal } from "../recording/PermissionBlockedModal";
+import { useMediaPermission } from "../../hooks/useMediaPermission";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
@@ -140,9 +140,13 @@ export function TitleBar() {
   };
 
   const [isInstallingFfmpeg, setIsInstallingFfmpeg] = useState(false);
-  const [showCameraBlockedModal, setShowCameraBlockedModal] = useState(false);
-  const cameraPermission = useCameraPermission();
+  const [blockedModal, setBlockedModal] = useState<
+    "camera" | "microphone" | null
+  >(null);
+  const cameraPermission = useMediaPermission("camera");
+  const microphonePermission = useMediaPermission("microphone");
   const cameraBlocked = cameraPermission === "denied";
+  const microphoneBlocked = microphonePermission === "denied";
 
   // Check webcam availability and fall back gracefully if the user's camera
   // permission is off. Called after FFmpeg is confirmed present.
@@ -324,7 +328,7 @@ export function TitleBar() {
           }
           onClick={() => {
             if (cameraBlocked) {
-              setShowCameraBlockedModal(true);
+              setBlockedModal("camera");
               return;
             }
             setWebcamEnabled(!webcamEnabled);
@@ -384,16 +388,26 @@ export function TitleBar() {
           SYS
         </button>
 
-        {/* Microphone toggle — disabled if no audio input device exists */}
+        {/* Microphone toggle — disabled if no audio input device exists,
+            amber + recovery modal if WebView2 mic permission is denied. */}
         <button
           title={
             !hasMicrophone
               ? "No microphone detected"
+              : microphoneBlocked
+              ? "Microphone blocked — click for help re-enabling"
               : micAudioEnabled
               ? "Microphone: ON"
               : "Microphone: OFF"
           }
-          onClick={() => hasMicrophone && setMicAudioEnabled(!micAudioEnabled)}
+          onClick={() => {
+            if (!hasMicrophone) return;
+            if (microphoneBlocked) {
+              setBlockedModal("microphone");
+              return;
+            }
+            setMicAudioEnabled(!micAudioEnabled);
+          }}
           disabled={!hasMicrophone}
           style={{
             display: "flex",
@@ -404,10 +418,17 @@ export function TitleBar() {
             borderRadius: 6,
             border: "none",
             cursor: hasMicrophone ? "pointer" : "not-allowed",
-            backgroundColor:
-              micAudioEnabled && hasMicrophone ? "rgba(0,120,212,0.15)" : "transparent",
+            backgroundColor: !hasMicrophone
+              ? "transparent"
+              : microphoneBlocked
+              ? "rgba(245, 158, 11, 0.15)"
+              : micAudioEnabled
+              ? "rgba(0,120,212,0.15)"
+              : "transparent",
             color: !hasMicrophone
               ? "var(--text-tertiary, #999)"
+              : microphoneBlocked
+              ? "#f59e0b"
               : micAudioEnabled
               ? "var(--accent-color)"
               : "var(--text-secondary)",
@@ -514,8 +535,11 @@ export function TitleBar() {
         </button>
       </div>
 
-      {showCameraBlockedModal && (
-        <CameraBlockedModal onClose={() => setShowCameraBlockedModal(false)} />
+      {blockedModal && (
+        <PermissionBlockedModal
+          device={blockedModal}
+          onClose={() => setBlockedModal(null)}
+        />
       )}
     </div>
   );

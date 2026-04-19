@@ -1,16 +1,44 @@
 import { X } from "lucide-react";
 
-interface CameraBlockedModalProps {
+interface PermissionBlockedModalProps {
+  device: "camera" | "microphone";
   onClose: () => void;
 }
 
+const COPY = {
+  camera: {
+    title: "Camera access is blocked",
+    intro:
+      "Klipp can't use your webcam because access was denied. Try the steps below to re-enable it.",
+    osStep: "Privacy & Security → Camera",
+    osDetails: [
+      "Turn on Camera access (for the device)",
+      "Turn on Let desktop apps access your camera",
+    ],
+  },
+  microphone: {
+    title: "Microphone access is blocked",
+    intro:
+      "Klipp can't use your microphone because access was denied. The audio level indicator and the recording's mic track both depend on this. Try the steps below to re-enable it.",
+    osStep: "Privacy & Security → Microphone",
+    osDetails: [
+      "Turn on Microphone access (for the device)",
+      "Turn on Let desktop apps access your microphone",
+    ],
+  },
+} as const;
+
 /**
- * Modal shown when the user clicks the CAM toggle while camera access is
+ * Modal shown when the user clicks the CAM/MIC toggle while access is
  * blocked in WebView2. Explains two recovery paths:
- *   1. Windows-level camera access (Settings → Privacy & Security → Camera)
+ *   1. Windows-level access (Settings → Privacy & Security → Camera/Microphone)
  *   2. WebView2-level permission (clearing the per-origin Block decision)
  */
-export function CameraBlockedModal({ onClose }: CameraBlockedModalProps) {
+export function PermissionBlockedModal({
+  device,
+  onClose,
+}: PermissionBlockedModalProps) {
+  const copy = COPY[device];
   return (
     <div
       onClick={onClose}
@@ -56,31 +84,47 @@ export function CameraBlockedModal({ onClose }: CameraBlockedModalProps) {
         </button>
 
         <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
-          Camera access is blocked
+          {copy.title}
         </h2>
 
         <p style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
-          Klipp can't use your webcam because access was denied. Try the steps
-          below to re-enable it.
+          {copy.intro}
         </p>
 
         <h3 style={{ fontSize: 13, fontWeight: 600, margin: "12px 0 6px" }}>
-          1. Allow camera at the Windows level
+          1. Allow at the Windows level
         </h3>
-        <ol style={{ fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", paddingLeft: 20 }}>
-          <li>Open <b>Windows Settings → Privacy &amp; Security → Camera</b></li>
-          <li>Turn on <b>Camera access</b> (for the device)</li>
-          <li>Turn on <b>Let desktop apps access your camera</b></li>
+        <ol
+          style={{
+            fontSize: 13,
+            lineHeight: 1.6,
+            margin: "0 0 12px",
+            paddingLeft: 20,
+          }}
+        >
+          <li>
+            Open <b>Windows Settings → {copy.osStep}</b>
+          </li>
+          {copy.osDetails.map((line, i) => (
+            <li key={i}>{line}</li>
+          ))}
         </ol>
 
         <h3 style={{ fontSize: 13, fontWeight: 600, margin: "12px 0 6px" }}>
           2. Reset the in-app permission
         </h3>
         <p style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 8px" }}>
-          If Windows settings are fine but the camera is still blocked, WebView2
+          If Windows settings are fine but it's still blocked, WebView2
           remembered your earlier <i>Block</i> decision. Reset it by:
         </p>
-        <ol style={{ fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", paddingLeft: 20 }}>
+        <ol
+          style={{
+            fontSize: 13,
+            lineHeight: 1.6,
+            margin: "0 0 12px",
+            paddingLeft: 20,
+          }}
+        >
           <li>Close Klipp completely</li>
           <li>
             Delete the WebView2 cache folder at:
@@ -99,7 +143,9 @@ export function CameraBlockedModal({ onClose }: CameraBlockedModalProps) {
               %LOCALAPPDATA%\com.fuselabs.klipp\EBWebView\
             </div>
           </li>
-          <li>Relaunch Klipp and click <b>Allow</b> when the camera prompt appears</li>
+          <li>
+            Relaunch Klipp and click <b>Allow</b> when the prompt appears
+          </li>
         </ol>
 
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>

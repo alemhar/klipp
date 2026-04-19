@@ -8,10 +8,10 @@ Screenshot capture, annotations, and all related tools work out of the box.
 
 **FFmpeg install prompt.** The **first time** you click the **Record** button, Klipp will ask permission to download FFmpeg (~30MB, one-time, automatic). This takes around 30 seconds on a decent connection. The Record button will show a spinner during install, then continue to the region-selector automatically. FFmpeg is not bundled with Klipp because of licensing; see [Third-Party Dependencies](#third-party-dependencies).
 
-**Camera permission prompt.** The first time you enable the on-overlay webcam bubble, Windows will show a permission dialog from WebView2 ("`localhost` wants to use your camera"). This is a standard browser-level prompt because Klipp uses the Web `getUserMedia` API to access the camera.
+**Camera & microphone permission prompts.** The first time you enable the on-overlay webcam bubble or the microphone toggle, Windows will show a permission dialog from WebView2 (e.g. "`localhost` wants to use your camera/microphone"). These are standard browser-level prompts because Klipp uses the Web `getUserMedia` API for the webcam preview and audio level indicator.
 
-If you accidentally click **Block** and later want to enable it, the **CAM** button in the title bar will turn amber and its tooltip will say "Camera blocked — click for help re-enabling". Clicking it opens a dialog with two recovery steps:
-1. Check **Windows Settings → Privacy & Security → Camera** is on for desktop apps.
+If you accidentally click **Block** and later want to enable it, the **CAM** or **MIC** button in the title bar will turn amber and its tooltip will say "Camera/Microphone blocked — click for help re-enabling". Clicking it opens a dialog with two recovery steps:
+1. Check **Windows Settings → Privacy & Security → Camera** (or **Microphone**) is on for desktop apps.
 2. If still blocked, clear the WebView2 cache folder at `%LOCALAPPDATA%\com.fuselabs.klipp\EBWebView\` and relaunch Klipp to re-prompt.
 
 ## Features

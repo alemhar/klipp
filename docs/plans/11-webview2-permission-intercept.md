@@ -1,6 +1,6 @@
-# Plan 11 — WebView2 Camera Permission Intercept
+# Plan 11 — WebView2 Camera & Microphone Permission Intercept
 
-> **Status**: 🚧 Future release. The shipping build has a Phase 1 fix (amber CAM icon + recovery modal); this plan covers the Phase 2 root-cause fix — intercepting the WebView2 permission request on the Rust side so users never see the raw "localhost wants to use your camera" dialog.
+> **Status**: 🚧 Future release. The shipping build has a Phase 1 fix that covers BOTH camera and microphone (amber CAM/MIC icons + a generic `PermissionBlockedModal` with device-specific recovery steps). This plan covers the Phase 2 root-cause fix — intercepting WebView2's `PermissionRequested` event on the Rust side so users never see the raw "localhost wants to use your camera/microphone" dialogs.
 
 ## Context
 
@@ -103,4 +103,4 @@ B. **Native dialog in-app**
 
 ## Out of Scope
 
-- Microphone permission — same idea could apply but we use FFmpeg-level capture for mics, not `getUserMedia`, so WebView2's mic prompt doesn't fire for our recording flow. Only the AudioLevelIndicator (which does use `getUserMedia`) would be affected; handling can reuse the same code path.
+- FFmpeg-level microphone access — that uses DirectShow, not WebView2/`getUserMedia`, so it isn't affected by this intercept. The OS-level Windows microphone permission still needs to be granted for FFmpeg to capture mic audio.
