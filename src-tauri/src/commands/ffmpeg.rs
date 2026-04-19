@@ -1,7 +1,21 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use tauri::{AppHandle, Manager};
+
+/// Build a `Command` that, on Windows, suppresses the console window FFmpeg/PowerShell
+/// would otherwise spawn alongside the GUI app. No-op on other platforms.
+pub fn hidden_command<S: AsRef<OsStr>>(program: S) -> Command {
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW — prevents the child from getting its own console window.
+        cmd.creation_flags(0x0800_0000);
+    }
+    cmd
+}
 
 fn ffmpeg_dir(app: &AppHandle) -> Result<PathBuf, String> {
     let data_dir = app
@@ -34,7 +48,7 @@ pub fn check_ffmpeg(app: AppHandle) -> Result<bool, String> {
     if bundled.exists() {
         return Ok(true);
     }
-    match Command::new("ffmpeg").arg("-version").output() {
+    match hidden_command("ffmpeg").arg("-version").output() {
         Ok(output) => Ok(output.status.success()),
         Err(_) => Ok(false),
     }
@@ -67,7 +81,7 @@ pub async fn download_ffmpeg(app: AppHandle) -> Result<(), String> {
         zip_path.to_string_lossy()
     );
 
-    let download_status = Command::new("powershell.exe")
+    let download_status = hidden_command("powershell.exe")
         .args(["-NoProfile", "-Command", &download_script])
         .status()
         .map_err(|e| format!("Failed to start download: {}", e))?;
@@ -113,7 +127,7 @@ pub async fn download_ffmpeg(app: AppHandle) -> Result<(), String> {
         exe_path.to_string_lossy()
     );
 
-    let extract_output = Command::new("powershell.exe")
+    let extract_output = hidden_command("powershell.exe")
         .args(["-NoProfile", "-Command", &extract_script])
         .output()
         .map_err(|e| format!("Failed to extract FFmpeg: {}", e))?;
@@ -133,7 +147,7 @@ pub async fn download_ffmpeg(app: AppHandle) -> Result<(), String> {
         return Err("FFmpeg extraction failed — file not created.".into());
     }
 
-    let verify = Command::new(&exe_path)
+    let verify = hidden_command(&exe_path)
         .arg("-version")
         .output()
         .map_err(|e| format!("FFmpeg verification failed: {}", e))?;
