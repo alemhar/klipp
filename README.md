@@ -12,8 +12,7 @@ A lightweight, native alternative to Microsoft Snipping Tool with real-time anno
 ![Rust](https://img.shields.io/badge/backend-Rust-dea584?logo=rust&logoColor=white)
 ![React 19](https://img.shields.io/badge/frontend-React%2019-61DAFB?logo=react&logoColor=white)
 
-<!-- TODO: Drop a hero screenshot or demo GIF here to boost attention -->
-<!-- Example: <img src="docs/images/hero.gif" alt="Klipp demo" width="720" /> -->
+<img src="docs/images/hero.jpg" alt="Klipp — the open-source Snipping Tool alternative" width="720" />
 
 ### [⬇ Download the latest release](https://github.com/alemhar/klipp/releases/latest)
 
