@@ -16,7 +16,6 @@ import { useUIStore } from "../../stores/uiStore";
 import { TextNode } from "./TextNode";
 import { ImageOverlayNode } from "./ImageOverlayNode";
 import type {
-  CanvasObject,
   DrawingObject,
   ShapeObject,
   TextObject,

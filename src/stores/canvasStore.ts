@@ -39,8 +39,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       past: [...past, objects],
       future: [],
+      // Spreading a Partial<CanvasObject> into a discriminated-union member
+      // widens the TS type; the cast preserves the runtime invariant that
+      // callers don't change an object's `type` via updateObject.
       objects: objects.map((o) =>
-        o.id === id ? { ...o, ...changes } : o
+        o.id === id ? ({ ...o, ...changes } as CanvasObject) : o
       ),
     });
   },

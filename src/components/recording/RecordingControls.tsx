@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { Square, RectangleHorizontal, MoveUpRight, Trash2, Camera } from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalPosition, LogicalSize } from "@tauri-apps/api/window";
 import { emit } from "@tauri-apps/api/event";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { useGlobalShortcut } from "../../hooks/useGlobalShortcut";
@@ -24,12 +24,10 @@ export function RecordingControls() {
     const setup = async () => {
       const mainWindow = getCurrentWindow();
       await mainWindow.setAlwaysOnTop(true);
-      await mainWindow.setSize({ type: "Logical", width: 400, height: 50 });
-      await mainWindow.setPosition({
-        type: "Logical",
-        x: Math.round(screen.width / 2 - 200),
-        y: 10,
-      });
+      await mainWindow.setSize(new LogicalSize(400, 50));
+      await mainWindow.setPosition(
+        new LogicalPosition(Math.round(screen.width / 2 - 200), 10)
+      );
       await mainWindow.setFocus();
     };
 

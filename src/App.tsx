@@ -21,7 +21,7 @@ import { useGlobalShortcut } from "./hooks/useGlobalShortcut";
 
 function App() {
   const { isCaptureMode, setIsCaptureMode, showSettings, activeTool } = useUIStore();
-  const { setCapturedImage, delay } = useCaptureStore();
+  const { delay } = useCaptureStore();
   const { undo, redo, addObject } = useCanvasStore();
   const [isDelaying, setIsDelaying] = useState(false);
   const { isRecording, isSelectingRegion } = useRecordingStore();
