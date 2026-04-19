@@ -8,6 +8,7 @@ import {
   Timer,
   ChevronDown,
   Video,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { useUIStore } from "../../stores/uiStore";
@@ -134,6 +135,63 @@ export function TitleBar() {
 
   const handleNewCapture = () => {
     setIsCaptureMode(true);
+  };
+
+  const [isInstallingFfmpeg, setIsInstallingFfmpeg] = useState(false);
+
+  // Check webcam availability and fall back gracefully if the user's camera
+  // permission is off. Called after FFmpeg is confirmed present.
+  const proceedToRecordFlow = async () => {
+    if (webcamEnabled) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        const webcams = await invoke<string[]>("list_webcams");
+        if (webcams.length === 0) {
+          alert(
+            "No webcam detected.\n\n" +
+            "If you have a camera, make sure:\n" +
+            "1. Go to Windows Settings > Privacy > Camera\n" +
+            "2. Turn ON 'Allow desktop apps to access your camera'\n\n" +
+            "Recording will continue without webcam."
+          );
+          setWebcamEnabled(false);
+        }
+      } catch {
+        setWebcamEnabled(false);
+      }
+    }
+    await saveWindowState();
+    setIsSelectingRegion(true);
+  };
+
+  const handleRecordClick = async () => {
+    if (isRecording || isInstallingFfmpeg) return;
+    const hasFfmpeg = await checkFfmpeg();
+    if (!hasFfmpeg) {
+      const shouldDownload = confirm(
+        "Screen recording requires FFmpeg (a free, open-source video encoder).\n\n" +
+        "Klipp will download it automatically (one-time only, ~30MB).\n" +
+        "This may take a minute depending on your internet speed.\n\n" +
+        "When the install finishes, Klipp will continue to the region selector."
+      );
+      if (!shouldDownload) return;
+      setIsInstallingFfmpeg(true);
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("download_ffmpeg");
+      } catch (e) {
+        setIsInstallingFfmpeg(false);
+        alert(
+          `Failed to download FFmpeg: ${e}\n\n` +
+          "You can install it manually via:\n  winget install Gyan.FFmpeg"
+        );
+        return;
+      }
+      setIsInstallingFfmpeg(false);
+      // Auto-proceed so the user's original intent (start recording) completes
+      // without a second click.
+    }
+    await proceedToRecordFlow();
   };
 
   const currentModeInfo = CAPTURE_MODES.find((m) => m.mode === mode) || CAPTURE_MODES[0];
@@ -343,50 +401,15 @@ export function TitleBar() {
 
         {/* Record button */}
         <button
-          title={isRecording ? "Recording..." : "Screen Record"}
-          onClick={async () => {
-            if (isRecording) return;
-            const hasFfmpeg = await checkFfmpeg();
-            if (!hasFfmpeg) {
-              const shouldDownload = confirm(
-                "Screen recording requires FFmpeg (a free, open-source video encoder).\n\n" +
-                "Klipp will download it automatically (one-time only).\n" +
-                "This may take a minute depending on your internet speed.\n\n" +
-                "Click OK to download now."
-              );
-              if (shouldDownload) {
-                try {
-                  const { invoke } = await import("@tauri-apps/api/core");
-                  await invoke("download_ffmpeg");
-                  alert("FFmpeg downloaded successfully! You can now use screen recording.");
-                } catch (e) {
-                  alert(`Failed to download FFmpeg: ${e}\n\nYou can install it manually via:\n  winget install Gyan.FFmpeg`);
-                }
-              }
-              return;
-            }
-            // If webcam is enabled, verify it's accessible
-            if (webcamEnabled) {
-              try {
-                const { invoke } = await import("@tauri-apps/api/core");
-                const webcams = await invoke<string[]>("list_webcams");
-                if (webcams.length === 0) {
-                  alert(
-                    "No webcam detected.\n\n" +
-                    "If you have a camera, make sure:\n" +
-                    "1. Go to Windows Settings > Privacy > Camera\n" +
-                    "2. Turn ON 'Allow desktop apps to access your camera'\n\n" +
-                    "Recording will continue without webcam."
-                  );
-                  setWebcamEnabled(false);
-                }
-              } catch {
-                setWebcamEnabled(false);
-              }
-            }
-            await saveWindowState();
-            setIsSelectingRegion(true);
-          }}
+          title={
+            isInstallingFfmpeg
+              ? "Installing FFmpeg... (one-time ~30MB download)"
+              : isRecording
+              ? "Recording..."
+              : "Screen Record"
+          }
+          onClick={handleRecordClick}
+          disabled={isInstallingFfmpeg}
           style={{
             display: "flex",
             alignItems: "center",
@@ -395,13 +418,33 @@ export function TitleBar() {
             height: 30,
             borderRadius: 6,
             border: "none",
-            cursor: isRecording ? "default" : "pointer",
-            backgroundColor: isRecording ? "rgba(255,59,48,0.15)" : "transparent",
-            color: isRecording ? "#FF3B30" : "var(--text-primary)",
+            cursor: isRecording
+              ? "default"
+              : isInstallingFfmpeg
+              ? "wait"
+              : "pointer",
+            backgroundColor: isRecording
+              ? "rgba(255,59,48,0.15)"
+              : isInstallingFfmpeg
+              ? "rgba(251, 191, 36, 0.15)"
+              : "transparent",
+            color: isRecording
+              ? "#FF3B30"
+              : isInstallingFfmpeg
+              ? "#f59e0b"
+              : "var(--text-primary)",
           }}
         >
-          <Video size={16} />
+          {isInstallingFfmpeg ? (
+            <Loader2
+              size={16}
+              style={{ animation: "klipp-spin 1s linear infinite" }}
+            />
+          ) : (
+            <Video size={16} />
+          )}
         </button>
+        <style>{`@keyframes klipp-spin { to { transform: rotate(360deg); } }`}</style>
 
         <div style={{ width: 1, height: 20, backgroundColor: "var(--border-color)", margin: "0 2px" }} />
 

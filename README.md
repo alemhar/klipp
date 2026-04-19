@@ -2,6 +2,12 @@
 
 An open-source screenshot and screen recording tool with powerful annotation support. Built as an alternative to Microsoft Snipping Tool — with features it's missing.
 
+## First run
+
+Screenshot capture, annotations, and all related tools work out of the box.
+
+The **first time** you click the **Record** button, Klipp will ask permission to download FFmpeg (~30MB, one-time, automatic). This takes around 30 seconds on a decent connection. The Record button will show a spinner during install, then continue to the region-selector automatically. FFmpeg is not bundled with Klipp because of licensing; see [Third-Party Dependencies](#third-party-dependencies).
+
 ## Features
 
 **Screenshot Capture**

@@ -31,6 +31,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 9. [09 — Window Capture Mode](./09-window-capture-mode.md) 🚧
    The capture-mode dropdown has a "Window" option that currently does nothing. Plan covers enumerating top-level windows, highlighting the one under cursor, and click-to-capture its bounds.
 
+10. [10 — Proactive FFmpeg First-Run UX](./10-ffmpeg-proactive-first-run-ux.md) 🚧
+    Follow-up to the shipped minimal fix (spinner + auto-proceed). Adds a proactive install banner on startup so users never hit a mid-workflow stall waiting for FFmpeg.
+
 ## Dependencies
 
 ```
