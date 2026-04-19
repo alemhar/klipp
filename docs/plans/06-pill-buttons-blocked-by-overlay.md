@@ -1,5 +1,12 @@
 # Plan 06 — Fix: Pill Buttons Blocked by Active Overlay Tool
 
+> **Status**: ✅ Resolved by Plan 04 on 2026-04-19. The region-sized overlay
+> (commit `a55459e`) no longer covers the recording pill's screen area for
+> typical recordings, so the overlay's interactive state no longer blocks
+> clicks on pill buttons. The only remaining case is when the recording
+> region explicitly overlaps the pill position (top-center, y≈10); this
+> edge case is acceptable for now.
+
 ## Context
 
 **Bug observation**: When a drawing tool (rectangle or arrow) is active on the overlay, the recording pill's toolbar buttons (switch tool, clear, webcam, cycle position, stop recording) can't be clicked. The user can still use keyboard shortcuts (`Ctrl+Shift+R/A/Z/W/E`) but not the visible buttons in the pill.

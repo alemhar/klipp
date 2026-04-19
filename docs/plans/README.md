@@ -13,14 +13,14 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 3. [03 — Microphone Audio Recording](./03-microphone-audio-recording.md) ✅ (SYS deferred)
    Separate mic + system audio toggles, device selection, FFmpeg mixing. MIC shipped with live audio level indicator. SYS deferred to a future release.
 
-4. [04 — Phase 6: Region-Sized Overlay + DPI + Multi-Monitor](./04-phase-6-region-sizing-and-dpi.md)
-   Replace fullscreen overlay with region-sized window. Fixes DPI issues and the latent gdigrab bug. Revisits Plans 01 and 02 to adapt to the new coordinate system.
+4. [04 — Phase 6: Region-Sized Overlay + DPI + Multi-Monitor](./04-phase-6-region-sizing-and-dpi.md) ✅ (core)
+   Region-sized overlay + outline + transparency-during-drawing shipped. DPI scaling, gdigrab DPI fix, ripple cap, and multi-monitor testing still pending (low priority at 100% DPI single-monitor).
 
 5. [05 — Timeout Investigation](./05-timeout-investigation.md) ✅ (no app bug)
    Research task. Root cause was Claude Code's Monitor tool, not the SnippingZo app. No code change required.
 
-6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md)
-   Known bug — pill buttons can't be clicked while a drawing tool is active. Floating toolbar on overlay as primary fix. Do last; Phase 6 (Plan 04) may partially resolve it.
+6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md) ✅ (resolved by Plan 04)
+   Auto-fixed — region-sized overlay no longer covers the recording pill area for typical recordings.
 
 7. [07 — Context-Aware `Ctrl+Shift+S` (Screenshot / Stop Recording)](./07-stop-recording-hotkey.md) ✅
    Reuses the existing capture shortcut as a state-dependent toggle: takes a screenshot when idle, stops the recording when one is active. Provides keyboard escape for the Plan 06 blocking bug.
