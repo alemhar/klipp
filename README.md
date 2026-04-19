@@ -15,6 +15,8 @@ A lightweight, native alternative to Microsoft Snipping Tool with real-time anno
 <!-- TODO: Drop a hero screenshot or demo GIF here to boost attention -->
 <!-- Example: <img src="docs/images/hero.gif" alt="Klipp demo" width="720" /> -->
 
+### [⬇ Download the latest release](https://github.com/alemhar/klipp/releases/latest)
+
 </div>
 
 ---
@@ -104,13 +106,17 @@ Existing screen tools each give up something. Klipp's goal is one small, fast, n
 
 ## 📦 Download & Getting Started
 
-<!-- TODO: Uncomment once a release installer is published
-### Install
-- [Windows (.exe installer)](https://github.com/alemhar/klipp/releases/latest)
-- [Portable ZIP](https://github.com/alemhar/klipp/releases/latest)
--->
+Grab the latest Windows build from the [Releases page](https://github.com/alemhar/klipp/releases/latest):
 
-Klipp is currently pre-release. The fastest way to try it today is to clone and run from source (see [Development](#-development)). Signed installers will be published to the [Releases page](https://github.com/alemhar/klipp/releases) when v0.2.0 ships.
+| Artifact | Best for |
+|---|---|
+| **`Klipp_<version>_x64-setup.exe`** (NSIS) | Most users — small wizard, Start-menu shortcut, clean uninstall |
+| **`Klipp_<version>_x64_en-US.msi`** | IT admins — Group Policy, Intune, SCCM deployments |
+| **`Klipp_<version>_x64-portable.exe`** | Power users — no installer, runs from any folder |
+
+> Builds are currently **unsigned**, so Windows SmartScreen may warn on first launch — click "More info → Run anyway". Code signing is on the roadmap.
+
+Prefer building from source? See [Development](#-development).
 
 ---
 
