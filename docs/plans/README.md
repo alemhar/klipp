@@ -37,6 +37,9 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
 11. [11 — WebView2 Camera Permission Intercept](./11-webview2-permission-intercept.md) 🚧
     Phase 2 of the camera-permission UX. The shipping build has a recovery modal + amber CAM icon when access is denied; this plan replaces the raw WebView2 permission dialog with a native Klipp prompt so users never see the localhost-looking browser dialog.
 
+12. [12 — Compact Pill-Mode Launch](./12-compact-pill-launch-mode.md) 🚧
+    Launch the app as a compact ~560×90 pill following the Microsoft Snipping Tool's initial navigation layout (New / Mode / Delay / Record / Cancel + Options + Expand, with helper text below), so the initial state doesn't obstruct the content being captured. Pill expands to full window after a capture or on demand.
+
 ## Dependencies
 
 ```
