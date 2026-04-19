@@ -5,10 +5,10 @@
 ## Findings (2026-04-17)
 
 ### What was reported
-User repeatedly saw "Monitor timed out — re-arm if needed." messages during Plan 01–04 development and assumed they were from the SnippingZo app itself.
+User repeatedly saw "Monitor timed out — re-arm if needed." messages during Plan 01–04 development and assumed they were from the Klipp app itself.
 
 ### Root cause
-The message comes from **Claude Code's `Monitor` tool** that the assistant uses to watch long-running background processes (like `npm run tauri dev`). It's an internal Claude Code tooling message surfaced in chat, not output from SnippingZo's Rust/React code.
+The message comes from **Claude Code's `Monitor` tool** that the assistant uses to watch long-running background processes (like `npm run tauri dev`). It's an internal Claude Code tooling message surfaced in chat, not output from Klipp's Rust/React code.
 
 **Distinguishing features**:
 - Format: `Monitor timed out — re-arm if needed.`
@@ -19,7 +19,7 @@ The message comes from **Claude Code's `Monitor` tool** that the assistant uses 
 **App-side**: there is currently **no reproducible app-level timeout**. None of the suspects below (`mpsc::channel` recv in `show_overlay`, WebView2 init stall, mouse-hook thread pump, Vite HMR) have surfaced a real failure during Plan 01, 02, or Plan 03 Step A testing.
 
 ### Verdict
-No code change needed in SnippingZo. The documented suspects remain valid design concerns — any of them could cause a real timeout if conditions change — but they are not observed today.
+No code change needed in Klipp. The documented suspects remain valid design concerns — any of them could cause a real timeout if conditions change — but they are not observed today.
 
 ### When to reopen
 Revisit this plan if the user sees timeouts:

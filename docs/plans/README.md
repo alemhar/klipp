@@ -17,7 +17,7 @@ Sequenced plan documents for remaining overlay work. Each plan is self-contained
    Region-sized overlay + outline + transparency-during-drawing shipped. DPI scaling, gdigrab DPI fix, ripple cap, and multi-monitor testing still pending (low priority at 100% DPI single-monitor).
 
 5. [05 — Timeout Investigation](./05-timeout-investigation.md) ✅ (no app bug)
-   Research task. Root cause was Claude Code's Monitor tool, not the SnippingZo app. No code change required.
+   Research task. Root cause was Claude Code's Monitor tool, not the Klipp app. No code change required.
 
 6. [06 — Fix: Pill Buttons Blocked by Active Overlay Tool](./06-pill-buttons-blocked-by-overlay.md) ✅ (resolved by Plan 04)
    Auto-fixed — region-sized overlay no longer covers the recording pill area for typical recordings.

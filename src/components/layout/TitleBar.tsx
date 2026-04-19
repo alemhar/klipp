@@ -350,7 +350,7 @@ export function TitleBar() {
             if (!hasFfmpeg) {
               const shouldDownload = confirm(
                 "Screen recording requires FFmpeg (a free, open-source video encoder).\n\n" +
-                "SnippingZo will download it automatically (one-time only).\n" +
+                "Klipp will download it automatically (one-time only).\n" +
                 "This may take a minute depending on your internet speed.\n\n" +
                 "Click OK to download now."
               );

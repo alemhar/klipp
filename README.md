@@ -1,4 +1,4 @@
-# SnippingZo
+# Klipp
 
 An open-source screenshot and screen recording tool with powerful annotation support. Built as an alternative to Microsoft Snipping Tool — with features it's missing.
 
@@ -54,8 +54,8 @@ An open-source screenshot and screen recording tool with powerful annotation sup
 ### Setup
 
 ```bash
-git clone https://github.com/FuselabsAI/SnippingZo.git
-cd SnippingZo
+git clone https://github.com/alemhar/klipp.git
+cd klipp
 npm install --legacy-peer-deps
 npm run tauri dev
 ```
@@ -70,7 +70,7 @@ Installers are generated in `src-tauri/target/release/bundle/`.
 
 ## Third-Party Dependencies
 
-**FFmpeg** — Screen recording uses [FFmpeg](https://ffmpeg.org/), a free and open-source multimedia framework licensed under LGPL/GPL. FFmpeg is **not bundled** with SnippingZo — it is downloaded automatically (~30MB) on first use of the screen recording feature. FFmpeg is stored in the app's local data directory and is only used for video encoding. You can also install FFmpeg manually via `winget install Gyan.FFmpeg`. Screenshot capture and all annotation features work without FFmpeg.
+**FFmpeg** — Screen recording uses [FFmpeg](https://ffmpeg.org/), a free and open-source multimedia framework licensed under LGPL/GPL. FFmpeg is **not bundled** with Klipp — it is downloaded automatically (~30MB) on first use of the screen recording feature. FFmpeg is stored in the app's local data directory and is only used for video encoding. You can also install FFmpeg manually via `winget install Gyan.FFmpeg`. Screenshot capture and all annotation features work without FFmpeg.
 
 ## Contributing
 
