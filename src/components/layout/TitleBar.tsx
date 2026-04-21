@@ -1,132 +1,162 @@
 import {
-  Camera,
+  Scissors,
   Settings,
   Moon,
   Sun,
   Square,
   Maximize,
-  Timer,
+  Monitor,
+  Minimize2,
+  Clock,
   ChevronDown,
   Video,
   Loader2,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useUIStore } from "../../stores/uiStore";
 import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
+import { useWindowModeStore } from "../../stores/windowModeStore";
+import { useRecordFlow } from "../../hooks/useRecordFlow";
 import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
 import { PermissionBlockedModal } from "../recording/PermissionBlockedModal";
 import { useMediaPermission } from "../../hooks/useMediaPermission";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
-const CAPTURE_MODES: {
-  mode: CaptureMode;
-  label: string;
-  icon: React.ReactNode;
-  disabled?: boolean;
-  disabledReason?: string;
-}[] = [
-  { mode: "rectangular", label: "Selection", icon: <Square size={14} /> },
-  { mode: "fullscreen", label: "Fullscreen", icon: <Maximize size={14} /> },
-  {
-    mode: "window",
-    label: "Window",
-    icon: <Square size={14} />,
-    disabled: true,
-    disabledReason:
-      "Window capture — coming in a future release.",
-  },
-];
+const CAPTURE_MODE_ICONS: Record<CaptureMode, React.ReactNode> = {
+  rectangular: <Square size={14} />,
+  fullscreen: <Maximize size={14} />,
+  window: <Monitor size={14} />,
+  freeform: <Square size={14} />,
+};
 
-const DELAY_OPTIONS: { value: DelayOption; label: string }[] = [
-  { value: 0, label: "No delay" },
-  { value: 3, label: "3 seconds" },
-  { value: 5, label: "5 seconds" },
-  { value: 10, label: "10 seconds" },
-];
+const DELAY_LABELS: Record<number, string> = {
+  0: "Delay",
+  3: "3 s",
+  5: "5 s",
+  10: "10 s",
+};
 
-function DropdownButton({
-  label,
-  icon,
-  children,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
+const NAV_BTN: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  height: 30,
+  padding: "0 10px",
+  borderRadius: 6,
+  border: "none",
+  cursor: "pointer",
+  backgroundColor: "transparent",
+  color: "var(--text-primary)",
+  fontSize: 12,
+};
 
-  return (
-    <div style={{ position: "relative" }}>
-      <button
-        title={label}
-        onClick={() => setOpen(!open)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 2,
-          height: 28,
-          padding: "0 6px",
-          borderRadius: 6,
-          border: "none",
-          cursor: "pointer",
-          backgroundColor: "transparent",
-          color: "var(--text-primary)",
-          fontSize: 12,
-        }}
-      >
-        {icon}
-        <ChevronDown size={12} />
-      </button>
-      {open && (
-        <>
-          <div
-            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99 }}
-            onClick={() => setOpen(false)}
-          />
-          <div
-            style={{
-              position: "absolute",
-              top: "100%",
-              left: 0,
-              marginTop: 4,
-              backgroundColor: "var(--bg-primary)",
-              border: "1px solid var(--border-color)",
-              borderRadius: 8,
-              padding: 4,
-              minWidth: 140,
-              zIndex: 100,
-              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
-            }}
-            onClick={() => setOpen(false)}
-          >
-            {children}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+const ICON_BTN: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 30,
+  height: 30,
+  borderRadius: 6,
+  border: "none",
+  cursor: "pointer",
+  backgroundColor: "transparent",
+  color: "var(--text-primary)",
+};
 
 export function TitleBar() {
-  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode } =
+  const { resolvedTheme, setTheme, setResolvedTheme, setShowSettings, setIsCaptureMode, isCaptureMode } =
     useUIStore();
   const { mode, delay, setMode, setDelay } = useCaptureStore();
   const {
     isRecording,
-    setIsSelectingRegion,
-    checkFfmpeg,
-    saveWindowState,
+    stopRecording,
     webcamEnabled,
     setWebcamEnabled,
     // System audio is deferred to a future release — see SYS button TODO below.
-    // Store fields `systemAudioEnabled`, `setSystemAudioEnabled`, `hasSystemAudioCapture`
-    // remain available; re-destructure them when re-enabling the feature.
     micAudioEnabled,
     setMicAudioEnabled,
     hasMicrophone,
   } = useRecordingStore();
+  const record = useRecordFlow();
+  const isInstallingFfmpeg = record.isInstallingFfmpeg;
+  const handleRecordClick = record.onClick;
+
+  const [blockedModal, setBlockedModal] = useState<"camera" | "microphone" | null>(null);
+  const cameraPermission = useMediaPermission("camera");
+  const microphonePermission = useMediaPermission("microphone");
+  const cameraBlocked = cameraPermission === "denied";
+  const microphoneBlocked = microphonePermission === "denied";
+
+  // Native pill-menu events arrive via Tauri emit. Listen here so the same
+  // Mode/Delay dropdowns work in full mode exactly like in pill mode.
+  const handlersRef = useRef({
+    setMode,
+    setDelay,
+    setMicAudioEnabled,
+    setWebcamEnabled,
+    setBlockedModal,
+    microphonePermission,
+    cameraPermission,
+  });
+  handlersRef.current = {
+    setMode,
+    setDelay,
+    setMicAudioEnabled,
+    setWebcamEnabled,
+    setBlockedModal,
+    microphonePermission,
+    cameraPermission,
+  };
+
+  useEffect(() => {
+    const unlistenPromise = listen<string>("pill-menu-selected", (event) => {
+      const id = event.payload;
+      const h = handlersRef.current;
+      if (id.startsWith("pill-mode:")) {
+        h.setMode(id.substring("pill-mode:".length) as CaptureMode);
+      } else if (id.startsWith("pill-delay:")) {
+        const n = parseInt(id.substring("pill-delay:".length), 10);
+        h.setDelay(n as DelayOption);
+      } else if (id === "pill-opts:mic") {
+        const currentlyOn = useRecordingStore.getState().micAudioEnabled;
+        if (!currentlyOn && h.microphonePermission === "denied") {
+          h.setBlockedModal("microphone");
+        } else {
+          h.setMicAudioEnabled(!currentlyOn);
+        }
+      } else if (id === "pill-opts:webcam") {
+        const currentlyOn = useRecordingStore.getState().webcamEnabled;
+        if (!currentlyOn && h.cameraPermission === "denied") {
+          h.setBlockedModal("camera");
+        } else {
+          h.setWebcamEnabled(!currentlyOn);
+        }
+      } else if (id === "pill-opts:prefs") {
+        useUIStore.getState().setShowSettings(true);
+      }
+    });
+    return () => {
+      unlistenPromise.then((fn) => fn());
+    };
+  }, []);
+
+  const showPillMenu = (kind: "mode" | "delay", btn: HTMLElement) => {
+    const rect = btn.getBoundingClientRect();
+    invoke("show_pill_menu", {
+      kind,
+      x: rect.left,
+      y: rect.bottom + 2,
+      currentMode: mode,
+      currentDelay: delay,
+      micEnabled: micAudioEnabled,
+      webcamEnabled,
+    }).catch((e) => console.error("show_pill_menu failed:", e));
+  };
 
   const toggleTheme = () => {
     const next = resolvedTheme === "light" ? "dark" : "light";
@@ -136,74 +166,15 @@ export function TitleBar() {
   };
 
   const handleNewCapture = () => {
+    if (isCaptureMode || isRecording) return;
     setIsCaptureMode(true);
   };
 
-  const [isInstallingFfmpeg, setIsInstallingFfmpeg] = useState(false);
-  const [blockedModal, setBlockedModal] = useState<
-    "camera" | "microphone" | null
-  >(null);
-  const cameraPermission = useMediaPermission("camera");
-  const microphonePermission = useMediaPermission("microphone");
-  const cameraBlocked = cameraPermission === "denied";
-  const microphoneBlocked = microphonePermission === "denied";
-
-  // Check webcam availability and fall back gracefully if the user's camera
-  // permission is off. Called after FFmpeg is confirmed present.
-  const proceedToRecordFlow = async () => {
-    if (webcamEnabled) {
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        const webcams = await invoke<string[]>("list_webcams");
-        if (webcams.length === 0) {
-          alert(
-            "No webcam detected.\n\n" +
-            "If you have a camera, make sure:\n" +
-            "1. Go to Windows Settings > Privacy > Camera\n" +
-            "2. Turn ON 'Allow desktop apps to access your camera'\n\n" +
-            "Recording will continue without webcam."
-          );
-          setWebcamEnabled(false);
-        }
-      } catch {
-        setWebcamEnabled(false);
-      }
-    }
-    await saveWindowState();
-    setIsSelectingRegion(true);
+  const cancelActive = isCaptureMode || isRecording;
+  const handleCancel = () => {
+    if (isRecording) stopRecording();
+    else if (isCaptureMode) setIsCaptureMode(false);
   };
-
-  const handleRecordClick = async () => {
-    if (isRecording || isInstallingFfmpeg) return;
-    const hasFfmpeg = await checkFfmpeg();
-    if (!hasFfmpeg) {
-      const shouldDownload = confirm(
-        "Screen recording requires FFmpeg (a free, open-source video encoder).\n\n" +
-        "Klipp will download it automatically (one-time only, ~30MB).\n" +
-        "This may take a minute depending on your internet speed.\n\n" +
-        "When the install finishes, Klipp will continue to the region selector."
-      );
-      if (!shouldDownload) return;
-      setIsInstallingFfmpeg(true);
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("download_ffmpeg");
-      } catch (e) {
-        setIsInstallingFfmpeg(false);
-        alert(
-          `Failed to download FFmpeg: ${e}\n\n` +
-          "You can install it manually via:\n  winget install Gyan.FFmpeg"
-        );
-        return;
-      }
-      setIsInstallingFfmpeg(false);
-      // Auto-proceed so the user's original intent (start recording) completes
-      // without a second click.
-    }
-    await proceedToRecordFlow();
-  };
-
-  const currentModeInfo = CAPTURE_MODES.find((m) => m.mode === mode) || CAPTURE_MODES[0];
 
   return (
     <div
@@ -215,108 +186,111 @@ export function TitleBar() {
         padding: "0 12px",
         backgroundColor: "var(--bg-toolbar)",
         borderBottom: "1px solid var(--border-color)",
-        height: 36,
+        height: 38,
       }}
     >
+      {/* App name */}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>{APP_NAME}</span>
       </div>
 
-      {/* Capture controls */}
+      {/* Standard navs — same sequence as pill: New → Mode → Delay → Record → Cancel */}
       <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-        {/* Capture mode selector */}
-        <DropdownButton label="Capture Mode" icon={currentModeInfo.icon}>
-          {CAPTURE_MODES.map((m) => (
-            <button
-              key={m.mode}
-              onClick={() => !m.disabled && setMode(m.mode)}
-              disabled={m.disabled}
-              title={m.disabled ? m.disabledReason : undefined}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "6px 8px",
-                borderRadius: 4,
-                border: "none",
-                cursor: m.disabled ? "not-allowed" : "pointer",
-                backgroundColor:
-                  mode === m.mode && !m.disabled
-                    ? "var(--accent-color)"
-                    : "transparent",
-                color: m.disabled
-                  ? "var(--text-tertiary, #999)"
-                  : mode === m.mode
-                  ? "#fff"
-                  : "var(--text-primary)",
-                fontSize: 12,
-                textAlign: "left",
-                opacity: m.disabled ? 0.55 : 1,
-              }}
-            >
-              {m.icon}
-              {m.label}
-            </button>
-          ))}
-        </DropdownButton>
-
-        {/* Delay selector */}
-        <DropdownButton
-          label="Capture Delay"
-          icon={
-            <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-              <Timer size={14} />
-              {delay > 0 && (
-                <span style={{ fontSize: 10, fontWeight: 600 }}>{delay}s</span>
-              )}
-            </div>
-          }
-        >
-          {DELAY_OPTIONS.map((d) => (
-            <button
-              key={d.value}
-              onClick={() => setDelay(d.value)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                width: "100%",
-                padding: "6px 8px",
-                borderRadius: 4,
-                border: "none",
-                cursor: "pointer",
-                backgroundColor: delay === d.value ? "var(--accent-color)" : "transparent",
-                color: delay === d.value ? "#fff" : "var(--text-primary)",
-                fontSize: 12,
-                textAlign: "left",
-              }}
-            >
-              {d.label}
-            </button>
-          ))}
-        </DropdownButton>
-
-        {/* Capture button */}
+        {/* ✂ New */}
         <button
-          title="New Capture"
+          title="New Capture (Ctrl+Shift+S)"
           onClick={handleNewCapture}
+          disabled={isCaptureMode || isRecording}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            backgroundColor: "transparent",
-            color: "var(--text-primary)",
+            ...NAV_BTN,
+            color: isCaptureMode || isRecording ? "var(--text-secondary)" : "#dc2626",
+            fontWeight: 600,
           }}
         >
-          <Camera size={16} />
+          <Scissors size={16} />
+          <span>New</span>
         </button>
 
+        {/* ▾ Mode */}
+        <button
+          title="Mode"
+          onClick={(e) => showPillMenu("mode", e.currentTarget)}
+          style={NAV_BTN}
+        >
+          {CAPTURE_MODE_ICONS[mode]}
+          <span>Mode</span>
+          <ChevronDown size={12} />
+        </button>
+
+        {/* ⏱ Delay */}
+        <button
+          title="Delay"
+          onClick={(e) => showPillMenu("delay", e.currentTarget)}
+          style={NAV_BTN}
+        >
+          <Clock size={14} />
+          <span>{DELAY_LABELS[delay] ?? "Delay"}</span>
+          <ChevronDown size={12} />
+        </button>
+
+        {/* ⏺ Record */}
+        <button
+          title={
+            isInstallingFfmpeg
+              ? "Installing FFmpeg... (one-time ~30MB download)"
+              : isRecording
+              ? "Recording..."
+              : "Screen Record"
+          }
+          onClick={handleRecordClick}
+          disabled={isInstallingFfmpeg || isCaptureMode}
+          style={{
+            ...NAV_BTN,
+            color: isRecording
+              ? "#FF3B30"
+              : isInstallingFfmpeg
+              ? "#f59e0b"
+              : "var(--text-primary)",
+            backgroundColor: isRecording
+              ? "rgba(255,59,48,0.1)"
+              : isInstallingFfmpeg
+              ? "rgba(251,191,36,0.1)"
+              : "transparent",
+            cursor: isRecording
+              ? "default"
+              : isInstallingFfmpeg
+              ? "wait"
+              : "pointer",
+          }}
+        >
+          {isInstallingFfmpeg ? (
+            <Loader2 size={14} style={{ animation: "klipp-spin 1s linear infinite" }} />
+          ) : (
+            <Video size={14} />
+          )}
+          <span>Record</span>
+        </button>
+        <style>{`@keyframes klipp-spin { to { transform: rotate(360deg); } }`}</style>
+
+        {/* ✕ Cancel */}
+        <button
+          title={cancelActive ? "Cancel" : "Nothing to cancel"}
+          onClick={handleCancel}
+          disabled={!cancelActive}
+          style={{
+            ...NAV_BTN,
+            color: cancelActive ? "var(--text-primary)" : "var(--text-secondary)",
+            cursor: cancelActive ? "pointer" : "default",
+            opacity: cancelActive ? 1 : 0.5,
+          }}
+        >
+          <X size={14} />
+          <span>Cancel</span>
+        </button>
+      </div>
+
+      {/* Window-mode extras — placed after the standard navs */}
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
         {/* Webcam toggle */}
         <button
           title={
@@ -334,14 +308,7 @@ export function TitleBar() {
             setWebcamEnabled(!webcamEnabled);
           }}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
+            ...ICON_BTN,
             backgroundColor: cameraBlocked
               ? "rgba(245, 158, 11, 0.15)"
               : webcamEnabled
@@ -354,6 +321,7 @@ export function TitleBar() {
               : "var(--text-secondary)",
             fontSize: 11,
             fontWeight: 600,
+            width: 36,
           }}
         >
           CAM
@@ -362,79 +330,63 @@ export function TitleBar() {
         {/* System audio toggle — deferred to a future release.
             TODO(next release): re-enable once we implement system-audio capture
             without requiring the third-party "virtual-audio-capturer" DirectShow
-            driver (e.g. via native WASAPI loopback). See Plan 03 doc. The state,
-            store fields (hasSystemAudioCapture, systemAudioEnabled) and Rust
-            backend support are already wired — just remove this override. */}
+            driver (e.g. via native WASAPI loopback). See Plan 03 doc. */}
         <button
           title="System Audio — coming in a future release"
           onClick={() => { /* intentionally disabled until next release */ }}
           disabled
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: "not-allowed",
-            backgroundColor: "transparent",
-            color: "var(--text-tertiary, #999)",
+            ...ICON_BTN,
+            color: "var(--text-secondary)",
             fontSize: 11,
             fontWeight: 600,
+            width: 36,
+            cursor: "not-allowed",
             opacity: 0.5,
           }}
         >
           SYS
         </button>
 
-        {/* Microphone toggle — disabled if no audio input device exists,
-            amber + recovery modal if WebView2 mic permission is denied. */}
+        {/* Microphone toggle */}
         <button
           title={
-            !hasMicrophone
-              ? "No microphone detected"
-              : microphoneBlocked
+            microphoneBlocked
               ? "Microphone blocked — click for help re-enabling"
+              : !hasMicrophone
+              ? "No microphone detected"
               : micAudioEnabled
               ? "Microphone: ON"
               : "Microphone: OFF"
           }
           onClick={() => {
-            if (!hasMicrophone) return;
             if (microphoneBlocked) {
               setBlockedModal("microphone");
               return;
             }
+            if (!hasMicrophone) return;
             setMicAudioEnabled(!micAudioEnabled);
           }}
-          disabled={!hasMicrophone}
+          disabled={!hasMicrophone && !microphoneBlocked}
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: hasMicrophone ? "pointer" : "not-allowed",
-            backgroundColor: !hasMicrophone
-              ? "transparent"
-              : microphoneBlocked
+            ...ICON_BTN,
+            backgroundColor: microphoneBlocked
               ? "rgba(245, 158, 11, 0.15)"
               : micAudioEnabled
               ? "rgba(0,120,212,0.15)"
               : "transparent",
-            color: !hasMicrophone
-              ? "var(--text-tertiary, #999)"
-              : microphoneBlocked
+            color: microphoneBlocked
               ? "#f59e0b"
+              : !hasMicrophone
+              ? "var(--text-secondary)"
               : micAudioEnabled
               ? "var(--accent-color)"
               : "var(--text-secondary)",
+            opacity: !hasMicrophone && !microphoneBlocked ? 0.4 : 1,
+            cursor: !hasMicrophone && !microphoneBlocked ? "not-allowed" : "pointer",
             fontSize: 11,
             fontWeight: 600,
-            opacity: hasMicrophone ? 1 : 0.5,
+            width: 36,
           }}
         >
           MIC
@@ -445,93 +397,25 @@ export function TitleBar() {
           <AudioLevelIndicator active={micAudioEnabled} width={44} height={20} />
         )}
 
-        {/* Record button */}
-        <button
-          title={
-            isInstallingFfmpeg
-              ? "Installing FFmpeg... (one-time ~30MB download)"
-              : isRecording
-              ? "Recording..."
-              : "Screen Record"
-          }
-          onClick={handleRecordClick}
-          disabled={isInstallingFfmpeg}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: isRecording
-              ? "default"
-              : isInstallingFfmpeg
-              ? "wait"
-              : "pointer",
-            backgroundColor: isRecording
-              ? "rgba(255,59,48,0.15)"
-              : isInstallingFfmpeg
-              ? "rgba(251, 191, 36, 0.15)"
-              : "transparent",
-            color: isRecording
-              ? "#FF3B30"
-              : isInstallingFfmpeg
-              ? "#f59e0b"
-              : "var(--text-primary)",
-          }}
-        >
-          {isInstallingFfmpeg ? (
-            <Loader2
-              size={16}
-              style={{ animation: "klipp-spin 1s linear infinite" }}
-            />
-          ) : (
-            <Video size={16} />
-          )}
-        </button>
-        <style>{`@keyframes klipp-spin { to { transform: rotate(360deg); } }`}</style>
-
-        <div style={{ width: 1, height: 20, backgroundColor: "var(--border-color)", margin: "0 2px" }} />
+        <div style={{ width: 1, height: 20, backgroundColor: "var(--border-color)", margin: "0 4px" }} />
 
         {/* Theme toggle */}
-        <button
-          title="Toggle Theme"
-          onClick={toggleTheme}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            backgroundColor: "transparent",
-            color: "var(--text-primary)",
-          }}
-        >
+        <button title="Toggle Theme" onClick={toggleTheme} style={ICON_BTN}>
           {resolvedTheme === "light" ? <Moon size={16} /> : <Sun size={16} />}
         </button>
 
         {/* Settings */}
-        <button
-          title="Settings"
-          onClick={() => setShowSettings(true)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: 30,
-            height: 30,
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            backgroundColor: "transparent",
-            color: "var(--text-primary)",
-          }}
-        >
+        <button title="Settings" onClick={() => setShowSettings(true)} style={ICON_BTN}>
           <Settings size={16} />
+        </button>
+
+        {/* Collapse to pill */}
+        <button
+          title="Collapse to compact pill"
+          onClick={() => useWindowModeStore.getState().collapseToPill()}
+          style={ICON_BTN}
+        >
+          <Minimize2 size={16} />
         </button>
       </div>
 

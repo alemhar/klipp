@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { TitleBar } from "./components/layout/TitleBar";
+import { PillModeBar } from "./components/layout/PillModeBar";
 import { Toolbar } from "./components/layout/Toolbar";
 import { StatusBar } from "./components/layout/StatusBar";
 import { ToolOptionsBar } from "./components/layout/ToolOptionsBar";
@@ -17,6 +18,7 @@ import { useCanvasStore } from "./stores/canvasStore";
 import type { TextObject } from "./types/canvas";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useRecordingStore } from "./stores/recordingStore";
+import { useWindowModeStore } from "./stores/windowModeStore";
 import { useGlobalShortcut } from "./hooks/useGlobalShortcut";
 
 function App() {
@@ -46,17 +48,22 @@ function App() {
     useUIStore.getState().setActiveTool("select");
   };
   const { settings, isLoaded, loadSettings } = useSettingsStore();
+  const windowMode = useWindowModeStore((s) => s.mode);
 
   // Load settings + enumerate audio inputs on mount
   useEffect(() => {
-    loadSettings();
-    useRecordingStore.getState().loadAudioInputs();
+    (async () => {
+      await loadSettings();
+      useWindowModeStore.getState().initFromSettings();
+      useRecordingStore.getState().loadAudioInputs();
 
-    // Apply theme
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const theme = settings.theme === "system" ? (prefersDark ? "dark" : "light") : settings.theme;
-    document.documentElement.setAttribute("data-theme", theme);
-    useUIStore.getState().setResolvedTheme(theme);
+      // Apply theme
+      const { settings: s } = useSettingsStore.getState();
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const theme = s.theme === "system" ? (prefersDark ? "dark" : "light") : s.theme;
+      document.documentElement.setAttribute("data-theme", theme);
+      useUIStore.getState().setResolvedTheme(theme);
+    })();
   }, []);
 
   // Handle capture shortcut — context-aware:
@@ -144,11 +151,17 @@ function App() {
         width: "100vw",
       }}
     >
-      <TitleBar />
-      <Toolbar />
-      <ToolOptionsBar />
-      <AnnotationCanvas />
-      <StatusBar />
+      {windowMode === "pill" ? (
+        <PillModeBar />
+      ) : (
+        <>
+          <TitleBar />
+          <Toolbar />
+          <ToolOptionsBar />
+          <AnnotationCanvas />
+          <StatusBar />
+        </>
+      )}
 
       {isDelaying && (
         <DelayTimer

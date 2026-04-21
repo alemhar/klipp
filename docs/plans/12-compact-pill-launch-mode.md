@@ -1,6 +1,6 @@
 # Plan 12 — Compact Pill-Mode Launch
 
-> **Status**: 🚧 Future release. App currently launches in full-size window which obstructs the view the user wants to capture.
+> **Status**: ✅ Shipped 2026-04-21 on branch `feat/pill-mode-launch`. Implementation diverged from the spec in two notable ways: (1) the Options popover and Mode/Delay dropdowns use **native OS popup menus** (via a Tauri `show_pill_menu` command) instead of DOM-based dropdowns — they paint outside the pill window the way Microsoft Snipping Tool does, with no window resize hack. (2) Post-capture window is sized to fit the captured region + chrome (Snipping Tool behaviour) rather than expanding to a fixed full-window size. The TitleBar in window mode was also re-ordered to match the pill's nav sequence (New → Mode → Delay → Record → Cancel) for cross-mode consistency, with CAM/MIC/SYS/Theme/Settings/Collapse appended after.
 
 ## Context
 

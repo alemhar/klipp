@@ -1,5 +1,14 @@
 export type Theme = "light" | "dark" | "system";
 
+export type LaunchMode = "pill" | "full";
+
+export interface WindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface AppSettings {
   theme: Theme;
   autoCopyToClipboard: boolean;
@@ -9,6 +18,9 @@ export interface AppSettings {
   captureShortcut: string;
   snipOutline: boolean;
   snipOutlineColor: string;
+  launchMode: LaunchMode;
+  pillBounds: WindowBounds | null;
+  fullBounds: WindowBounds | null;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -20,4 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   captureShortcut: "Ctrl+Shift+S",
   snipOutline: false,
   snipOutlineColor: "#FF0000",
+  launchMode: "pill",
+  pillBounds: null,
+  fullBounds: null,
 };
