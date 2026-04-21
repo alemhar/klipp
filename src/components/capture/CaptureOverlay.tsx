@@ -5,6 +5,7 @@ import { useCaptureStore } from "../../stores/captureStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useCanvasStore } from "../../stores/canvasStore";
+import { useWindowModeStore } from "../../stores/windowModeStore";
 import { copyImageToClipboard } from "../../lib/export";
 import type { CaptureResult } from "../../types/capture";
 
@@ -42,6 +43,12 @@ export function CaptureOverlay() {
   const finishCapture = useCallback(
     async (result: CaptureResult) => {
       await restoreMainWindow();
+      // If launched as a pill, resize the window to fit the captured region
+      // plus annotation chrome — mirrors Snipping Tool's post-capture UX.
+      const { mode: windowMode, expandToCaptureSize } = useWindowModeStore.getState();
+      if (windowMode === "pill") {
+        await expandToCaptureSize(result.width, result.height);
+      }
       setIsCaptureMode(false);
       useCanvasStore.getState().clearAll();
       setCapturedImage(result);
@@ -74,6 +81,10 @@ export function CaptureOverlay() {
           // Restore and show result without overlay
           await mainWindow.show();
           await mainWindow.setFocus();
+          const { mode: windowMode, expandToCaptureSize } = useWindowModeStore.getState();
+          if (windowMode === "pill") {
+            await expandToCaptureSize(pngResult.width, pngResult.height);
+          }
           setIsCaptureMode(false);
           useCanvasStore.getState().clearAll();
           setCapturedImage(pngResult);
