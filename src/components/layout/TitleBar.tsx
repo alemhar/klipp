@@ -13,7 +13,7 @@ import {
   Loader2,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useUIStore } from "../../stores/uiStore";
@@ -22,8 +22,7 @@ import { useRecordingStore } from "../../stores/recordingStore";
 import { useWindowModeStore } from "../../stores/windowModeStore";
 import { useRecordFlow } from "../../hooks/useRecordFlow";
 import { AudioLevelIndicator } from "../recording/AudioLevelIndicator";
-import { PermissionBlockedModal } from "../recording/PermissionBlockedModal";
-import { useMediaPermission } from "../../hooks/useMediaPermission";
+import { useConsentStore } from "../../stores/consentStore";
 import { APP_NAME } from "../../lib/constants";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
@@ -86,31 +85,29 @@ export function TitleBar() {
   const isInstallingFfmpeg = record.isInstallingFfmpeg;
   const handleRecordClick = record.onClick;
 
-  const [blockedModal, setBlockedModal] = useState<"camera" | "microphone" | null>(null);
-  const cameraPermission = useMediaPermission("camera");
-  const microphonePermission = useMediaPermission("microphone");
-  const cameraBlocked = cameraPermission === "denied";
-  const microphoneBlocked = microphonePermission === "denied";
+  const cameraConsent = useConsentStore((s) => s.camera);
+  const microphoneConsent = useConsentStore((s) => s.microphone);
+  const requestConsent = useConsentStore((s) => s.request);
+  const cameraBlocked = cameraConsent === "denied";
+  const microphoneBlocked = microphoneConsent === "denied";
 
   // Native pill-menu events arrive via Tauri emit. Listen here so the same
-  // Mode/Delay dropdowns work in full mode exactly like in pill mode.
+  // Mode/Delay dropdowns work in full mode exactly like in pill mode. Ref
+  // keeps latest handlers accessible from the listener without re-subscribing
+  // on every render.
   const handlersRef = useRef({
     setMode,
     setDelay,
     setMicAudioEnabled,
     setWebcamEnabled,
-    setBlockedModal,
-    microphonePermission,
-    cameraPermission,
+    requestConsent,
   });
   handlersRef.current = {
     setMode,
     setDelay,
     setMicAudioEnabled,
     setWebcamEnabled,
-    setBlockedModal,
-    microphonePermission,
-    cameraPermission,
+    requestConsent,
   };
 
   useEffect(() => {
@@ -124,17 +121,17 @@ export function TitleBar() {
         h.setDelay(n as DelayOption);
       } else if (id === "pill-opts:mic") {
         const currentlyOn = useRecordingStore.getState().micAudioEnabled;
-        if (!currentlyOn && h.microphonePermission === "denied") {
-          h.setBlockedModal("microphone");
+        if (currentlyOn) {
+          h.setMicAudioEnabled(false);
         } else {
-          h.setMicAudioEnabled(!currentlyOn);
+          h.requestConsent("microphone", () => h.setMicAudioEnabled(true));
         }
       } else if (id === "pill-opts:webcam") {
         const currentlyOn = useRecordingStore.getState().webcamEnabled;
-        if (!currentlyOn && h.cameraPermission === "denied") {
-          h.setBlockedModal("camera");
+        if (currentlyOn) {
+          h.setWebcamEnabled(false);
         } else {
-          h.setWebcamEnabled(!currentlyOn);
+          h.requestConsent("camera", () => h.setWebcamEnabled(true));
         }
       } else if (id === "pill-opts:prefs") {
         useUIStore.getState().setShowSettings(true);
@@ -301,11 +298,11 @@ export function TitleBar() {
               : "Webcam: OFF"
           }
           onClick={() => {
-            if (cameraBlocked) {
-              setBlockedModal("camera");
-              return;
+            if (webcamEnabled) {
+              setWebcamEnabled(false);
+            } else {
+              requestConsent("camera", () => setWebcamEnabled(true));
             }
-            setWebcamEnabled(!webcamEnabled);
           }}
           style={{
             ...ICON_BTN,
@@ -360,12 +357,12 @@ export function TitleBar() {
               : "Microphone: OFF"
           }
           onClick={() => {
-            if (microphoneBlocked) {
-              setBlockedModal("microphone");
+            if (micAudioEnabled) {
+              setMicAudioEnabled(false);
               return;
             }
-            if (!hasMicrophone) return;
-            setMicAudioEnabled(!micAudioEnabled);
+            if (!hasMicrophone && !microphoneBlocked) return;
+            requestConsent("microphone", () => setMicAudioEnabled(true));
           }}
           disabled={!hasMicrophone && !microphoneBlocked}
           style={{
@@ -419,12 +416,6 @@ export function TitleBar() {
         </button>
       </div>
 
-      {blockedModal && (
-        <PermissionBlockedModal
-          device={blockedModal}
-          onClose={() => setBlockedModal(null)}
-        />
-      )}
     </div>
   );
 }

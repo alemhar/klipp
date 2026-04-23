@@ -223,6 +223,13 @@ pub async fn show_overlay(
     #[cfg(windows)]
     apply_webview_transparency(&overlay).map_err(|e| e.to_string())?;
 
+    // Attach the PermissionRequested handler so the webcam bubble's
+    // getUserMedia call is authorized by our stored consent instead of
+    // triggering WebView2's Chromium permission prompt.
+    #[cfg(windows)]
+    crate::commands::permissions::attach_permission_handler(&overlay)
+        .map_err(|e| e.to_string())?;
+
     overlay
         .set_ignore_cursor_events(true)
         .map_err(|e: tauri::Error| e.to_string())?;

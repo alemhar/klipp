@@ -1,6 +1,6 @@
 # Plan 11 — WebView2 Camera & Microphone Permission Intercept
 
-> **Status**: 🚧 Future release. The shipping build has a Phase 1 fix that covers BOTH camera and microphone (amber CAM/MIC icons + a generic `PermissionBlockedModal` with device-specific recovery steps). This plan covers the Phase 2 root-cause fix — intercepting WebView2's `PermissionRequested` event on the Rust side so users never see the raw "localhost wants to use your camera/microphone" dialogs.
+> **Status**: ✅ Completed 2026-04-23 — feat/pill-mode-launch. Phase 2 shipped: WebView2's `PermissionRequested` event is intercepted on the Rust side and authorized against a Klipp-owned consent state. Users see a branded in-app consent modal instead of the Chromium "localhost wants to use your camera/microphone" prompt. Consent decisions persist to `settings.json` and can be reset from the recovery modal's "Allow it now" button.
 
 ## Context
 
@@ -20,12 +20,14 @@ Problems with the default WebView2 prompt:
 
 This helps users escape but still exposes them to the raw dialog the first time.
 
-## Proposed Phase 2 — native intercept
+## Shipped Phase 2 — native intercept (what actually landed)
 
-Handle WebView2's `PermissionRequested` event on the Rust side via Tauri's `with_webview()` to:
-1. **Show our own styled dialog** instead of the Chromium one. The dialog can say "Klipp wants to use your webcam for the recording bubble. [Allow] [Block]".
-2. **Control persistence ourselves** — so a Block decision doesn't dead-end. Next time the user toggles CAM, we show our dialog again unless they explicitly checked "remember this".
-3. **Keep state in-app** — so Settings → Camera Permission can show the current state and let the user reset from inside Klipp.
+Chose **frontend-driven consent, Rust-side suppression** over a COM-dispatched native dialog:
+
+- React owns the consent UX. A new `PermissionConsentModal` (Klipp-branded, icon + device-specific copy + Allow / Don't allow) is shown via the `useDeviceConsent(device)` hook before any `getUserMedia` call.
+- Rust owns authorization. A `ConsentState` in-memory cache is seeded from `settings.json` at boot and mirrored by the `set_device_consent` command. The WebView2 `PermissionRequested` handler reads that cache and replies with `COREWEBVIEW2_PERMISSION_STATE_ALLOW` only when stored consent is `"allowed"`; `"unknown"` and `"denied"` both map to `DENY`. This is defense-in-depth — a React bug cannot grant silent access.
+- Consent persists in `settings.json` (`camera_consent`, `microphone_consent`). Mis-click recovery goes through the recovery modal's **"Allow it now"** button, which resets stored consent to `"unknown"` and immediately re-opens the consent modal.
+- The handler is attached to both WebView2 instances that can call `getUserMedia`: the main window (for `AudioLevelIndicator`) and the overlay window (for the webcam bubble in `OverlayApp`).
 
 ## Implementation Sketch
 

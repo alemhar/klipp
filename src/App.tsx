@@ -12,6 +12,7 @@ import { SettingsPanel } from "./components/settings/SettingsPanel";
 import { EmojiPicker } from "./components/canvas/EmojiPicker";
 import { RecordingControls } from "./components/recording/RecordingControls";
 import { RecordingRegionSelector } from "./components/recording/RecordingRegionSelector";
+import { DeviceConsentGate } from "./components/recording/DeviceConsentGate";
 import { useUIStore } from "./stores/uiStore";
 import { useCaptureStore } from "./stores/captureStore";
 import { useCanvasStore } from "./stores/canvasStore";
@@ -19,6 +20,7 @@ import type { TextObject } from "./types/canvas";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useRecordingStore } from "./stores/recordingStore";
 import { useWindowModeStore } from "./stores/windowModeStore";
+import { useConsentStore } from "./stores/consentStore";
 import { useGlobalShortcut } from "./hooks/useGlobalShortcut";
 
 function App() {
@@ -56,6 +58,7 @@ function App() {
       await loadSettings();
       useWindowModeStore.getState().initFromSettings();
       useRecordingStore.getState().loadAudioInputs();
+      useConsentStore.getState().loadFromBackend();
 
       // Apply theme
       const { settings: s } = useSettingsStore.getState();
@@ -182,6 +185,7 @@ function App() {
           onClose={() => useUIStore.getState().setActiveTool("select")}
         />
       )}
+      <DeviceConsentGate />
     </div>
   );
 }

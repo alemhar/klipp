@@ -51,9 +51,26 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .manage(commands::recording::RecordingState::new())
+        .manage(commands::permissions::ConsentState::new())
         .setup(|app| {
             tray::create_tray(app)?;
             apply_initial_window_state(app.handle());
+
+            // Seed the in-memory consent cache from settings.json so the
+            // WebView2 PermissionRequested handler sees the correct state on
+            // the very first getUserMedia call after launch.
+            let stored = commands::settings::get_settings_internal(app.handle()).unwrap_or_default();
+            app.state::<commands::permissions::ConsentState>()
+                .load_from_settings(&stored.camera_consent, &stored.microphone_consent);
+
+            // Attach the PermissionRequested handler to the main window's
+            // WebView2 so AudioLevelIndicator's mic stream (opened in the main
+            // window) is authorized by our stored consent rather than the
+            // Chromium prompt. Overlay window gets its own attachment in
+            // show_overlay — see commands/overlay.rs.
+            if let Some(main_win) = app.get_webview_window("main") {
+                let _ = commands::permissions::attach_permission_handler(&main_win);
+            }
             Ok(())
         })
         .on_menu_event(|app, event| {
@@ -97,6 +114,8 @@ pub fn run() {
             commands::overlay::set_overlay_interactive,
             commands::overlay::start_mouse_hook,
             commands::overlay::stop_mouse_hook,
+            commands::permissions::get_device_consent,
+            commands::permissions::set_device_consent,
             commands::pill_menu::show_pill_menu,
         ])
         .run(tauri::generate_context!())
