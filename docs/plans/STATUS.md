@@ -2,7 +2,7 @@
 
 Quick at-a-glance status of every plan in [`docs/plans/`](.). For execution order, descriptions, and dependencies, see [README.md](./README.md). For full implementation detail, open the individual plan file.
 
-**Summary:** 8 shipped · 2 partially shipped · 4 pending · **12 total**
+**Summary:** 9 shipped · 2 partially shipped · 3 pending · **12 total**
 
 | # | Plan | Status | Notes |
 |---|------|--------|-------|
@@ -16,7 +16,7 @@ Quick at-a-glance status of every plan in [`docs/plans/`](.). For execution orde
 | 08 | [WebView2 Content Drift Root-Cause Fix](./08-webview-content-drift-root-cause.md) | 🚧 Pending | Workaround (larger outline pad) shipped; proper fix via WndProc subclass / DWM frame extension still owed |
 | 09 | [Window Capture Mode](./09-window-capture-mode.md) | 🚧 Pending | "Window" option in capture-mode dropdown is currently a no-op |
 | 10 | [Proactive FFmpeg First-Run UX](./10-ffmpeg-proactive-first-run-ux.md) | 🚧 Pending | Minimal fix (spinner + auto-proceed) shipped; proactive install banner pending |
-| 11 | [WebView2 Camera Permission Intercept](./11-webview2-permission-intercept.md) | 🚧 Pending | Recovery modal + amber CAM icon shipped; native Klipp prompt instead of WebView2 dialog still owed |
+| 11 | [WebView2 Camera Permission Intercept](./11-webview2-permission-intercept.md) | ✅ Shipped | Rust `PermissionRequested` handler + Klipp-branded `PermissionConsentModal` + persisted consent in `settings.json`. Chromium dialog never surfaces. |
 | 12 | [Compact Pill-Mode Launch](./12-compact-pill-launch-mode.md) | ✅ Shipped | Two-row pill (560×90) with native OS popup menus for Mode/Delay/Options. Auto-resizes to fit captured region after Snip. TitleBar nav reordered to match pill sequence. |
 
 ## Legend

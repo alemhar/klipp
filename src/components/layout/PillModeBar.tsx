@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
@@ -20,8 +20,7 @@ import { useCaptureStore } from "../../stores/captureStore";
 import { useRecordingStore } from "../../stores/recordingStore";
 import { useWindowModeStore } from "../../stores/windowModeStore";
 import { useRecordFlow } from "../../hooks/useRecordFlow";
-import { useMediaPermission } from "../../hooks/useMediaPermission";
-import { PermissionBlockedModal } from "../recording/PermissionBlockedModal";
+import { useConsentStore } from "../../stores/consentStore";
 import type { CaptureMode, DelayOption } from "../../types/capture";
 
 const CAPTURE_MODE_ICONS: Record<CaptureMode, React.ReactNode> = {
@@ -65,9 +64,6 @@ export function PillModeBar() {
   } = useRecordingStore();
   const { expandToFull } = useWindowModeStore();
   const record = useRecordFlow();
-  const cameraPermission = useMediaPermission("camera");
-  const microphonePermission = useMediaPermission("microphone");
-  const [blockedModal, setBlockedModal] = useState<"camera" | "microphone" | null>(null);
 
   // Keep latest state available to the native-menu event listener, which
   // runs outside React's render cycle.
@@ -78,9 +74,6 @@ export function PillModeBar() {
     setWebcamEnabled,
     setShowSettings,
     expandToFull,
-    setBlockedModal,
-    cameraPermission,
-    microphonePermission,
   });
   stateRef.current = {
     setMode,
@@ -89,9 +82,6 @@ export function PillModeBar() {
     setWebcamEnabled,
     setShowSettings,
     expandToFull,
-    setBlockedModal,
-    cameraPermission,
-    microphonePermission,
   };
 
   useEffect(() => {
@@ -105,17 +95,32 @@ export function PillModeBar() {
         s.setDelay(n as DelayOption);
       } else if (id === "pill-opts:mic") {
         const currentlyOn = useRecordingStore.getState().micAudioEnabled;
-        if (!currentlyOn && s.microphonePermission === "denied") {
-          s.setBlockedModal("microphone");
+        if (currentlyOn) {
+          s.setMicAudioEnabled(false);
         } else {
-          s.setMicAudioEnabled(!currentlyOn);
+          // Consent / blocked modals are React overlays and don't fit inside
+          // the 560x90 pill. Expand to full window first — same pattern as
+          // the Preferences option below. The consent store's pending
+          // callback survives the remount, so when the user clicks Allow in
+          // the now-expanded window the mic still toggles on.
+          (async () => {
+            await s.expandToFull();
+            useConsentStore
+              .getState()
+              .request("microphone", () => s.setMicAudioEnabled(true));
+          })();
         }
       } else if (id === "pill-opts:webcam") {
         const currentlyOn = useRecordingStore.getState().webcamEnabled;
-        if (!currentlyOn && s.cameraPermission === "denied") {
-          s.setBlockedModal("camera");
+        if (currentlyOn) {
+          s.setWebcamEnabled(false);
         } else {
-          s.setWebcamEnabled(!currentlyOn);
+          (async () => {
+            await s.expandToFull();
+            useConsentStore
+              .getState()
+              .request("camera", () => s.setWebcamEnabled(true));
+          })();
         }
       } else if (id === "pill-opts:prefs") {
         (async () => {
@@ -315,12 +320,6 @@ export function PillModeBar() {
         {helperText}
       </div>
 
-      {blockedModal && (
-        <PermissionBlockedModal
-          device={blockedModal}
-          onClose={() => setBlockedModal(null)}
-        />
-      )}
     </div>
   );
 }

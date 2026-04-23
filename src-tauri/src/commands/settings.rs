@@ -16,6 +16,10 @@ fn default_launch_mode() -> String {
     "pill".to_string()
 }
 
+fn default_consent() -> String {
+    "unknown".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -34,6 +38,15 @@ pub struct AppSettings {
     pub pill_bounds: Option<WindowBounds>,
     #[serde(default)]
     pub full_bounds: Option<WindowBounds>,
+
+    // Per-device consent state for the in-app permission intercept. Values are
+    // one of "unknown" | "allowed" | "denied". The Rust-side PermissionRequested
+    // handler reads these as its authorization oracle so WebView2's Chromium
+    // prompt never surfaces to the user.
+    #[serde(default = "default_consent")]
+    pub camera_consent: String,
+    #[serde(default = "default_consent")]
+    pub microphone_consent: String,
 }
 
 impl Default for AppSettings {
@@ -50,6 +63,8 @@ impl Default for AppSettings {
             launch_mode: default_launch_mode(),
             pill_bounds: None,
             full_bounds: None,
+            camera_consent: default_consent(),
+            microphone_consent: default_consent(),
         }
     }
 }

@@ -1,15 +1,17 @@
 import { X } from "lucide-react";
+import { APP_NAME } from "../../lib/constants";
 
 interface PermissionBlockedModalProps {
   device: "camera" | "microphone";
+  /** Re-opens the consent modal so the user can grant access. */
+  onAllowNow: () => void;
   onClose: () => void;
 }
 
 const COPY = {
   camera: {
-    title: "Camera access is blocked",
-    intro:
-      "Klipp can't use your webcam because access was denied. Try the steps below to re-enable it.",
+    title: "Camera access is off",
+    intro: `${APP_NAME} can't use your webcam right now.`,
     osStep: "Privacy & Security → Camera",
     osDetails: [
       "Turn on Camera access (for the device)",
@@ -17,9 +19,8 @@ const COPY = {
     ],
   },
   microphone: {
-    title: "Microphone access is blocked",
-    intro:
-      "Klipp can't use your microphone because access was denied. The audio level indicator and the recording's mic track both depend on this. Try the steps below to re-enable it.",
+    title: "Microphone access is off",
+    intro: `${APP_NAME} can't use your microphone right now. The live audio-level indicator and the recording's mic track both depend on it.`,
     osStep: "Privacy & Security → Microphone",
     osDetails: [
       "Turn on Microphone access (for the device)",
@@ -29,13 +30,23 @@ const COPY = {
 } as const;
 
 /**
- * Modal shown when the user clicks the CAM/MIC toggle while access is
- * blocked in WebView2. Explains two recovery paths:
- *   1. Windows-level access (Settings → Privacy & Security → Camera/Microphone)
- *   2. WebView2-level permission (clearing the per-origin Block decision)
+ * Shown when the user toggles CAM/MIC while access is denied. Covers two
+ * recovery paths:
+ *   1. App-level: clicking "Allow it now" re-opens the Klipp consent modal
+ *      (common case — the user previously picked Don't allow).
+ *   2. OS-level: if Windows Privacy & Security has blocked camera/mic
+ *      globally, the app-level reset can't fix that — the user must toggle
+ *      it in Windows Settings.
+ *
+ * Note: earlier releases of this modal walked the user through deleting the
+ * WebView2 cache folder. That's no longer needed — the Rust-side
+ * PermissionRequested handler now authorizes against our own stored consent,
+ * so flipping consent back to "unknown" via "Allow it now" is all that's
+ * required.
  */
 export function PermissionBlockedModal({
   device,
+  onAllowNow,
   onClose,
 }: PermissionBlockedModalProps) {
   const copy = COPY[device];
@@ -54,12 +65,15 @@ export function PermissionBlockedModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="permission-blocked-title"
         style={{
           backgroundColor: "var(--bg-primary)",
           color: "var(--text-primary)",
           borderRadius: 8,
           padding: 20,
-          maxWidth: 520,
+          maxWidth: 480,
           width: "90%",
           boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
           position: "relative",
@@ -83,85 +97,96 @@ export function PermissionBlockedModal({
           <X size={16} />
         </button>
 
-        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 12px" }}>
+        <h2
+          id="permission-blocked-title"
+          style={{ fontSize: 16, fontWeight: 600, margin: "0 0 10px" }}
+        >
           {copy.title}
         </h2>
 
-        <p style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 12px" }}>
+        <p style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 14px" }}>
           {copy.intro}
         </p>
 
-        <h3 style={{ fontSize: 13, fontWeight: 600, margin: "12px 0 6px" }}>
-          1. Allow at the Windows level
-        </h3>
-        <ol
+        <div
           style={{
-            fontSize: 13,
-            lineHeight: 1.6,
-            margin: "0 0 12px",
-            paddingLeft: 20,
+            padding: 12,
+            borderRadius: 6,
+            backgroundColor: "var(--bg-secondary, rgba(0,0,0,0.04))",
+            margin: "0 0 14px",
           }}
         >
-          <li>
-            Open <b>Windows Settings → {copy.osStep}</b>
-          </li>
-          {copy.osDetails.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ol>
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              margin: "0 0 4px",
+            }}
+          >
+            Windows blocking it instead?
+          </p>
+          <p
+            style={{
+              fontSize: 12,
+              lineHeight: 1.5,
+              margin: 0,
+              color: "var(--text-secondary)",
+            }}
+          >
+            If the prompt doesn't reappear after you click Allow it now, open{" "}
+            <b>Windows Settings → {copy.osStep}</b> and make sure:
+          </p>
+          <ul
+            style={{
+              fontSize: 12,
+              lineHeight: 1.55,
+              margin: "4px 0 0",
+              paddingLeft: 18,
+              color: "var(--text-secondary)",
+            }}
+          >
+            {copy.osDetails.map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+          </ul>
+        </div>
 
-        <h3 style={{ fontSize: 13, fontWeight: 600, margin: "12px 0 6px" }}>
-          2. Reset the in-app permission
-        </h3>
-        <p style={{ fontSize: 13, lineHeight: 1.5, margin: "0 0 8px" }}>
-          If Windows settings are fine but it's still blocked, WebView2
-          remembered your earlier <i>Block</i> decision. Reset it by:
-        </p>
-        <ol
+        <div
           style={{
-            fontSize: 13,
-            lineHeight: 1.6,
-            margin: "0 0 12px",
-            paddingLeft: 20,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
           }}
         >
-          <li>Close Klipp completely</li>
-          <li>
-            Delete the WebView2 cache folder at:
-            <div
-              style={{
-                fontFamily: "monospace",
-                fontSize: 12,
-                backgroundColor: "var(--bg-secondary, rgba(0,0,0,0.05))",
-                padding: "6px 8px",
-                borderRadius: 4,
-                margin: "4px 0",
-                overflowX: "auto",
-                whiteSpace: "nowrap",
-              }}
-            >
-              %LOCALAPPDATA%\com.zyntaxzo.klipp\EBWebView\
-            </div>
-          </li>
-          <li>
-            Relaunch Klipp and click <b>Allow</b> when the prompt appears
-          </li>
-        </ol>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
           <button
             onClick={onClose}
             style={{
               padding: "6px 14px",
               borderRadius: 6,
               border: "1px solid var(--border-color)",
-              backgroundColor: "var(--accent-color)",
-              color: "#fff",
+              backgroundColor: "transparent",
+              color: "var(--text-primary)",
               cursor: "pointer",
               fontSize: 13,
             }}
           >
-            Got it
+            Cancel
+          </button>
+          <button
+            onClick={onAllowNow}
+            autoFocus
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: "1px solid var(--accent-color)",
+              backgroundColor: "var(--accent-color)",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Allow it now
           </button>
         </div>
       </div>
