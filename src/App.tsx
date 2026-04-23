@@ -13,6 +13,7 @@ import { EmojiPicker } from "./components/canvas/EmojiPicker";
 import { RecordingControls } from "./components/recording/RecordingControls";
 import { RecordingRegionSelector } from "./components/recording/RecordingRegionSelector";
 import { DeviceConsentGate } from "./components/recording/DeviceConsentGate";
+import { FfmpegInstallModal } from "./components/recording/FfmpegInstallModal";
 import { useUIStore } from "./stores/uiStore";
 import { useCaptureStore } from "./stores/captureStore";
 import { useCanvasStore } from "./stores/canvasStore";
@@ -186,6 +187,7 @@ function App() {
         />
       )}
       <DeviceConsentGate />
+      <FfmpegInstallModal />
     </div>
   );
 }
